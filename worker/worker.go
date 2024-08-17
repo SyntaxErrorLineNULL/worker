@@ -92,3 +92,21 @@ func (w *Worker) setStatus(status worker.Status) {
 	// This updates the worker's status field with the new status.
 	w.status = status
 }
+
+// GetStatus is a method that retrieves the current status of a Worker instance.
+// It ensures that the status is accessed in a thread-safe manner by locking the
+// worker's mutex before reading the status. This prevents race conditions and
+// ensures that the value returned is consistent, even in a concurrent environment.
+func (w *Worker) GetStatus() worker.Status {
+	// Lock the worker's mutex to protect its state from concurrent access.
+	// This ensures that the status is read safely without race conditions.
+	w.mutex.RLock()
+
+	// Ensure that the mutex is unlocked when the function exits.
+	// This is done using a deferred call to RUnlock, which will execute after the function returns.
+	defer w.mutex.RUnlock()
+
+	// Return the worker's current status.
+	// This provides the caller with the current value of the worker's status field.
+	return w.status
+}
