@@ -74,3 +74,21 @@ func (w *Worker) SetQueue(queue chan worker.Task) error {
 	// Return nil indicating that the operation was successful.
 	return nil
 }
+
+// setStatus is responsible for safely updating the status of a Worker instance in a concurrent environment.
+// It uses a mutex to ensure that only one goroutine can modify the worker's status at a time, preventing
+// race conditions that could lead to inconsistent state or unexpected behavior. The method locks the worker's
+// state, sets the status, and then releases the lock, ensuring that the operation is thread-safe.
+func (w *Worker) setStatus(status worker.Status) {
+	// Lock the worker's mutex to protect its state from concurrent access.
+	// This ensures that the worker's status is set safely without race conditions.
+	w.mutex.RLock()
+
+	// Ensure that the mutex is unlocked when the function exits.
+	// This is done using a deferred call to RUnlock, which will execute after the function returns.
+	defer w.mutex.RUnlock()
+
+	// Set the worker's status to the provided status value.
+	// This updates the worker's status field with the new status.
+	w.status = status
+}
