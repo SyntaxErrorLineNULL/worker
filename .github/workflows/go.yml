@@ -5,24 +5,37 @@ name: Go
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - 'main'
+    tags:
+      - '*'
   pull_request:
-    branches: [ "main" ]
+    branches:
+      - 'main'
+  workflow_dispatch:
+
+concurrency:
+  group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
+  cancel-in-progress: true
 
 jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - 'ubuntu-latest'
+          - 'macos-latest'
 
-  build:
-    runs-on: ubuntu-latest
-    steps:
+    runs-on: '${{ matrix.os }}'
+
+  steps:
     - uses: actions/checkout@v4
 
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v5
       with:
-        go-version: '1.22'
-
-    #- name: Build
-    #  run: go build -v ./...
+        go-version-file: 'go.mod'
 
     - name: Test
       run: go test -v ./...
