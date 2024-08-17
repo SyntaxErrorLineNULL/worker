@@ -61,3 +61,32 @@ func (p *Pool) RunningWorkers() int32 {
 	// The Load method is used to safely read the value atomically.
 	return p.workerConcurrency.Load()
 }
+
+// incrementWorkerCount attempts to increment the worker count if it's below the maximum limit.
+// It protects the worker count and associated wait group using a mutex to ensure
+// thread-safety while managing the pool's worker count.
+// If the current worker count is less than the maximum allowed workers, it increments
+// the worker count and adds one to the wait group, signifying that a new worker is being started.
+// If the maximum worker limit has been reached, it returns false to indicate that no more workers can be started.
+func (p *Pool) incrementWorkerCount() bool {
+	// Lock the mutex to protect the worker count and wait group.
+	// This prevents race conditions when modifying the worker count.
+	p.mutex.Lock()
+	// Ensure the mutex is unlocked when the function returns.
+	defer p.mutex.Unlock()
+
+	// Get the current count of running workers.
+	counter := p.RunningWorkers()
+
+	// Check if the current worker count has reached the maximum limit.
+	if counter >= p.maxWorkersCount {
+		// The maximum worker limit has been reached, no more workers can be started.
+		return false
+	}
+
+	// Increment the worker counter.
+	p.workerConcurrency.Add(1)
+
+	// Return true to indicate that the worker count was successfully incremented.
+	return true
+}
