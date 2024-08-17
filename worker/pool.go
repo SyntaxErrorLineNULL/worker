@@ -2,6 +2,8 @@ package worker
 
 import (
 	"context"
+	"log"
+	"os"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -23,9 +25,14 @@ type Pool struct {
 	onceStop          sync.Once          // Used for a one-time action (stopping the pool).
 	stopped           bool               // flag signaling that the worker pool has already been stopped. The flag is needed to understand whether it is necessary to restore some worker after its fall, perhaps the worker pool is already stopped.
 	workerErrorCh     chan *worker.Error // A channel for worker error. It is needed so that in case of panic we can restore the Worker's operation.
+	logger            *log.Logger
 }
 
 func NewWorkerPool(options *worker.Options) *Pool {
+	logger := log.New(os.Stdout, "pool:", log.LstdFlags)
+
+	logger.Print("new worker pool")
+
 	concurrency := options.WorkerCount
 
 	if concurrency == 0 {
@@ -43,6 +50,7 @@ func NewWorkerPool(options *worker.Options) *Pool {
 		stopCh:            make(chan struct{}, 1),
 		stopped:           false,
 		workerErrorCh:     make(chan *worker.Error),
+		logger:            logger,
 	}
 }
 
