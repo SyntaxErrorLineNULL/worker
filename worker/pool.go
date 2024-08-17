@@ -90,3 +90,12 @@ func (p *Pool) incrementWorkerCount() bool {
 	// Return true to indicate that the worker count was successfully incremented.
 	return true
 }
+
+// decrementWorkerCount decrements the worker count in the worker pool.
+// It utilizes an atomic operation to safely decrease the worker count.
+// This method is called when a worker is stopped or removed from the pool.
+func (p *Pool) decrementWorkerCount() {
+	// Use atomic operation to safely decrease the worker count.
+	// atomic.AddInt32(&p.workerConcurrency, -1)
+	p.workerConcurrency.Add(-1)
+}
