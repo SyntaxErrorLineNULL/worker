@@ -45,3 +45,11 @@ func NewWorkerPool(options *worker.Options) *Pool {
 		workerErrorCh:     make(chan *worker.Error),
 	}
 }
+
+// RunningWorkers returns the current number of running workers in the pool.
+// It retrieves the count of active workers using atomic operations to ensure thread safety.
+func (p *Pool) RunningWorkers() int32 {
+	// Return the current value of workerConcurrency, which represents the number of running workers.
+	// The Load method is used to safely read the value atomically.
+	return p.workerConcurrency.Load()
+}
