@@ -22,33 +22,8 @@ func (_m *Processing) EXPECT() *Processing_Expecter {
 }
 
 // ErrorHandler provides a mock function with given fields: ctx, input
-func (_m *Processing) ErrorHandler(ctx context.Context, input interface{}) (interface{}, error) {
-	ret := _m.Called(ctx, input)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ErrorHandler")
-	}
-
-	var r0 interface{}
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, interface{}) (interface{}, error)); ok {
-		return rf(ctx, input)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, interface{}) interface{}); ok {
-		r0 = rf(ctx, input)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(interface{})
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, interface{}) error); ok {
-		r1 = rf(ctx, input)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+func (_m *Processing) ErrorHandler(ctx context.Context, input interface{}) {
+	_m.Called(ctx, input)
 }
 
 // Processing_ErrorHandler_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ErrorHandler'
@@ -70,44 +45,19 @@ func (_c *Processing_ErrorHandler_Call) Run(run func(ctx context.Context, input 
 	return _c
 }
 
-func (_c *Processing_ErrorHandler_Call) Return(_a0 interface{}, _a1 error) *Processing_ErrorHandler_Call {
-	_c.Call.Return(_a0, _a1)
+func (_c *Processing_ErrorHandler_Call) Return() *Processing_ErrorHandler_Call {
+	_c.Call.Return()
 	return _c
 }
 
-func (_c *Processing_ErrorHandler_Call) RunAndReturn(run func(context.Context, interface{}) (interface{}, error)) *Processing_ErrorHandler_Call {
+func (_c *Processing_ErrorHandler_Call) RunAndReturn(run func(context.Context, interface{})) *Processing_ErrorHandler_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // Processing provides a mock function with given fields: ctx, input
-func (_m *Processing) Processing(ctx context.Context, input interface{}) (interface{}, error) {
-	ret := _m.Called(ctx, input)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Processing")
-	}
-
-	var r0 interface{}
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, interface{}) (interface{}, error)); ok {
-		return rf(ctx, input)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, interface{}) interface{}); ok {
-		r0 = rf(ctx, input)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(interface{})
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, interface{}) error); ok {
-		r1 = rf(ctx, input)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+func (_m *Processing) Processing(ctx context.Context, input interface{}) {
+	_m.Called(ctx, input)
 }
 
 // Processing_Processing_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Processing'
@@ -129,12 +79,59 @@ func (_c *Processing_Processing_Call) Run(run func(ctx context.Context, input in
 	return _c
 }
 
-func (_c *Processing_Processing_Call) Return(_a0 interface{}, _a1 error) *Processing_Processing_Call {
-	_c.Call.Return(_a0, _a1)
+func (_c *Processing_Processing_Call) Return() *Processing_Processing_Call {
+	_c.Call.Return()
 	return _c
 }
 
-func (_c *Processing_Processing_Call) RunAndReturn(run func(context.Context, interface{}) (interface{}, error)) *Processing_Processing_Call {
+func (_c *Processing_Processing_Call) RunAndReturn(run func(context.Context, interface{})) *Processing_Processing_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Result provides a mock function with given fields:
+func (_m *Processing) Result() chan interface{} {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Result")
+	}
+
+	var r0 chan interface{}
+	if rf, ok := ret.Get(0).(func() chan interface{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(chan interface{})
+		}
+	}
+
+	return r0
+}
+
+// Processing_Result_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Result'
+type Processing_Result_Call struct {
+	*mock.Call
+}
+
+// Result is a helper method to define mock.On call
+func (_e *Processing_Expecter) Result() *Processing_Result_Call {
+	return &Processing_Result_Call{Call: _e.mock.On("Result")}
+}
+
+func (_c *Processing_Result_Call) Run(run func()) *Processing_Result_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Processing_Result_Call) Return(_a0 chan interface{}) *Processing_Result_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Processing_Result_Call) RunAndReturn(run func() chan interface{}) *Processing_Result_Call {
 	_c.Call.Return(run)
 	return _c
 }
