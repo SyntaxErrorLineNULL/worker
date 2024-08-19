@@ -195,4 +195,22 @@ func TestTask(t *testing.T) {
 		// informative error message for invalid inputs.
 		assert.Equal(t, "context cannot be nil", err.Error(), "error message should be 'context cannot be nil'")
 	})
+
+	// GetName tests the String method of the Task struct to ensure that it
+	// correctly returns the name of the task. This test verifies that the
+	// String method accurately reflects the task's name as stored in the
+	// Task struct.
+	t.Run("GetName", func(t *testing.T) {
+		// Define the expected name that will be assigned to the Task instance.
+		name := "test-name"
+
+		// Create a new Task instance and initialize it with the specified name.
+		// The Task struct should have a 'name' field that stores this value.
+		task := &Task{name: name}
+
+		// Assert that the String method of the Task instance returns the correct name.
+		// The String method is expected to return the name of the task as a string.
+		// This assertion will fail if the returned value does not match the expected name.
+		assert.Equal(t, name, task.String(), "String() should return the task's name")
+	})
 }
