@@ -83,4 +83,21 @@ func TestTask(t *testing.T) {
 		// The actual value is the task's doneCh field.
 		assert.Equal(t, (chan<- struct{})(doneCh), task.doneCh, "expected the task's done channel to be set correctly")
 	})
+
+	// SetEmptyChannel tests the SetDoneChannel method of the Task struct
+	// when attempting to set a nil channel. This test ensures that the method
+	// correctly handles the case where a nil channel is provided, returning
+	// an appropriate error.
+	t.Run("SetEmptyChannel", func(t *testing.T) {
+		// Create a new instance of Task.
+		task := &Task{}
+
+		// Attempt to set a nil channel for the Task using the SetDoneChannel method.
+		// The method is expected to return an error in this case.
+		err := task.SetDoneChannel(nil)
+
+		// Assert that an error was returned from SetDoneChannel.
+		// This check confirms that the method properly handles the nil channel.
+		assert.Error(t, err, "expected error when setting a nil done channel")
+	})
 }
