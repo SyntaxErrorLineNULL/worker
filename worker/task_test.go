@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"worker/mocks"
@@ -134,5 +135,35 @@ func TestTask(t *testing.T) {
 		// error message returned to ensure it matches expected error messages.
 		// This is useful if you want to validate the exact reason for the failure.
 		assert.Equal(t, "cannot set a closed channel", err.Error(), "unexpected error message")
+	})
+
+	// SetContext tests the SetContext method of the Task struct to ensure
+	// it correctly sets the internal context of the Task instance. This method
+	// is expected to update the Task's context to the provided context value and
+	// handle different scenarios such as valid and empty contexts.
+	t.Run("SetContext", func(t *testing.T) {
+		// Create a new instance of Task. This is the object on which the
+		// SetContext method will be tested.
+		task := &Task{}
+
+		// Create a background context using context.Background().
+		// This context will be used as the input to the SetContext method.
+		ctx := context.Background()
+
+		// Call the SetContext method on the Task instance, passing the created context.
+		// This method should set the internal context of the Task to the provided context.
+		err := task.SetContext(ctx)
+
+		// Assert that no error is returned from the SetContext method. This checks
+		// that the method executed successfully without encountering any issues
+		// and confirms that it handles the provided context correctly.
+		assert.NoError(t, err, "SetContext should not return an error")
+
+		// Assert that the Task's internal context (parentCtx) is correctly set to
+		// the context that was passed to the SetContext method. This ensures that
+		// the method has updated the internal state of the Task instance as expected.
+		// The expected value is the context passed to SetContext, and the actual
+		// value is the Task's parentCtx field.
+		assert.Equal(t, ctx, task.parentCtx, "expected Task's context to be set correctly")
 	})
 }
