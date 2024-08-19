@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"sync"
 	"testing"
 	"worker/mocks"
 
@@ -18,4 +19,25 @@ func TestTask(t *testing.T) {
 	// It ensures that the mock object is properly set up for use in the test, avoiding issues related to nil references.
 	assert.NotNil(t, mockProcessing, "Expected mockProcessing to be initialized and not nil")
 
+	// SetWaitGroup tests the SetWaitGroup method of the Task struct.
+	// It verifies that the method correctly assigns a provided WaitGroup to the Task,
+	// and ensures that no errors occur when a valid WaitGroup is passed.
+	t.Run("SetWaitGroup", func(t *testing.T) {
+		// Initialize a new WaitGroup.
+		var wg sync.WaitGroup
+		// Create a new instance of Job.
+		job := &Task{}
+
+		// Set the wait group for the job using the SetWaitGroup method.
+		err := job.SetWaitGroup(&wg)
+		// Assert that no error was returned from SetWaitGroup.
+		// This check confirms that the method handled the valid WaitGroup correctly.
+		assert.NoError(t, err, "expected no error when setting a valid WaitGroup")
+
+		// Assert that the wait group was set correctly in the job.
+		// The expected value is the address of the initialized WaitGroup.
+		// The actual value is the job's wg field.
+		// The message "expected the job's wait group to be set correctly" is displayed if the assertion fails.
+		assert.Equal(t, &wg, job.wg, "expected the job's wait group to be set correctly")
+	})
 }
