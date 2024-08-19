@@ -59,3 +59,9 @@ func NewTask(timeout time.Duration, taskName string, processing worker.Processin
 		stopCh: make(chan struct{}, 1),
 	}
 }
+
+// GetName returns the name of the task.
+// This method retrieves the name assigned to the task instance.
+func (t *Task) String() string {
+	return t.name
+}
