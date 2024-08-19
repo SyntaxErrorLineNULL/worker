@@ -40,4 +40,27 @@ func TestTask(t *testing.T) {
 		// The message "expected the job's wait group to be set correctly" is displayed if the assertion fails.
 		assert.Equal(t, &wg, job.wg, "expected the job's wait group to be set correctly")
 	})
+
+	// SetDoneChannel tests the SetDoneChannel method of the Task struct.
+	// It ensures that the method correctly assigns a provided done channel to the Task,
+	// and verifies that no errors occur during this process.
+	t.Run("SetDoneChannel", func(t *testing.T) {
+		// Create a done channel.
+		doneCh := make(chan struct{})
+
+		// Create a new instance of Job.
+		task := &Task{}
+
+		// Set the done channel for the task using the SetDoneChannel method.
+		// The method should return no error if the done channel is valid.
+		err := task.SetDoneChannel(doneCh)
+		// Assert that no error was returned from SetDoneChannel.
+		// This check confirms that the method handled the done channel correctly.
+		assert.NoError(t, err, "expected no error when setting a valid done channel")
+
+		// Assert that the done channel was set correctly in the task.
+		// The expected value is the done channel cast to a send-only channel.
+		// The actual value is the task's doneCh field.
+		assert.Equal(t, (chan<- struct{})(doneCh), task.doneCh, "expected the task's done channel to be set correctly")
+	})
 }
