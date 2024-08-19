@@ -100,4 +100,39 @@ func TestTask(t *testing.T) {
 		// This check confirms that the method properly handles the nil channel.
 		assert.Error(t, err, "expected error when setting a nil done channel")
 	})
+
+	// SetCloseChannel tests the SetDoneChannel method of the Task struct
+	// when a closed channel is provided. This test ensures that the method
+	// correctly identifies and handles the scenario where a closed channel
+	// is passed, and returns an appropriate error.
+	t.Run("SetCloseChannel", func(t *testing.T) {
+		// Create a done channel using make. This will be used to test the behavior
+		// of the SetDoneChannel method when a closed channel is passed.
+		doneCh := make(chan struct{})
+
+		// Create a new instance of Task. This represents the object whose
+		// SetDoneChannel method will be tested.
+		task := &Task{}
+
+		// Close the done channel to simulate an invalid state where the channel
+		// is already closed. This is to test how SetDoneChannel handles such cases.
+		close(doneCh)
+
+		// Attempt to set the closed channel for the Task using the SetDoneChannel method.
+		// The method should identify that the channel is closed and handle it appropriately.
+		// The expected outcome is that an error is returned since the channel should not be set
+		// if it is closed.
+		err := task.SetDoneChannel(doneCh)
+
+		// Assert that an error is returned from SetDoneChannel. This assertion checks
+		// that the method correctly identifies and rejects the closed channel.
+		// The test will fail if no error is returned, indicating that the method did
+		// not handle the closed channel as expected.
+		assert.Error(t, err, "expected error when setting a closed done channel")
+
+		// Optionally, you could add an assertion to check the specific
+		// error message returned to ensure it matches expected error messages.
+		// This is useful if you want to validate the exact reason for the failure.
+		assert.Equal(t, "cannot set a closed channel", err.Error(), "unexpected error message")
+	})
 }
