@@ -166,4 +166,33 @@ func TestTask(t *testing.T) {
 		// value is the Task's parentCtx field.
 		assert.Equal(t, ctx, task.parentCtx, "expected Task's context to be set correctly")
 	})
+
+	// SetEmptyContext tests the SetContext method of the Task struct to ensure
+	// it correctly handles the case when a nil context is provided. This test
+	// verifies that the method returns an appropriate error when attempting to
+	// set the Task's context to nil, which is an invalid operation.
+	t.Run("SetEmptyContext", func(t *testing.T) {
+		// Create a new instance of Task. This instance will be used to test the
+		// SetContext method. Initially, the Task's internal context should be
+		// uninitialized or set to its zero value.
+		task := &Task{}
+
+		// Call the SetContext method on the Task instance, passing a nil context.
+		// The SetContext method is expected to handle the nil context case
+		// and return an error because setting a nil context is not valid.
+		err := task.SetContext(nil)
+
+		// Assert that the SetContext method returns an error when given a nil context.
+		// This checks that the method correctly identifies and handles the invalid input.
+		// The assertion will fail if no error is returned or if the error does not match
+		// the expected error message.
+		assert.Error(t, err, "SetContext should return an error when given a nil context")
+
+		// Assert that the error returned from SetContext matches the expected error message.
+		// The expected message is "context cannot be nil", which indicates that the method
+		// correctly identifies the issue with a nil context. This ensures that the error
+		// handling is properly implemented and that the method provides a clear and
+		// informative error message for invalid inputs.
+		assert.Equal(t, "context cannot be nil", err.Error(), "error message should be 'context cannot be nil'")
+	})
 }
