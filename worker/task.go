@@ -60,6 +60,12 @@ func NewTask(timeout time.Duration, taskName string, processing worker.Processin
 	}
 }
 
+// SetContext sets the parent context for the task.
+// This allows updating the parent context during the execution of the task.
+func (t *Task) SetContext(ctx context.Context) {
+	t.parentCtx = ctx
+}
+
 // GetName returns the name of the task.
 // This method retrieves the name assigned to the task instance.
 func (t *Task) String() string {
