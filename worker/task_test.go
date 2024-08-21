@@ -2,8 +2,10 @@ package worker
 
 import (
 	"context"
+	"github.com/stretchr/testify/mock"
 	"sync"
 	"testing"
+	"time"
 	"worker/mocks"
 
 	"github.com/stretchr/testify/assert"
@@ -212,5 +214,96 @@ func TestTask(t *testing.T) {
 		// The String method is expected to return the name of the task as a string.
 		// This assertion will fail if the returned value does not match the expected name.
 		assert.Equal(t, name, task.String(), "String() should return the task's name")
+	})
+
+	// TaskCompletesWithoutTimeout tests the Run method of the Job struct to ensure that a job
+	// completes without timing out. It verifies that the job correctly executes its task
+	// within the allowed time and signals completion through the done channel.
+	t.Run("TaskCompletesWithoutTimeout", func(t *testing.T) {
+		// Define the worker timeout duration for the test.
+		// This is the maximum amount of time we allow for the task to complete.
+		timeout := 1 * time.Second
+
+		// Initialize input data for the processing function.
+		// `inputProcessingData` represents an example integer input (in this case, `222`)
+		// that will be passed to the processing function. The integer is cast to `int32`
+		// to match the expected data type used by the processing function.
+		inputProcessingData := int32(222)
+
+		// Define the error handler input as a string.
+		// `inputErrorHandler` is set to "error handler" and is intended to be used
+		// as the input for the error handling function in the task.
+		// This string will simulate or represent an identifier or message to be processed by the error handler.
+		inputErrorHandler := "error handler"
+
+		// Create a new task instance with the specified timeout, name, processing function, and input data.
+		// This task simulates a job that will be processed within the test.
+		task := NewTask(timeout, "test-task", mockProcessing, inputProcessingData, inputErrorHandler)
+		// Assert that the task was successfully created.
+		// If the task is nil, it indicates a problem with task initialization.
+		assert.NotNil(t, task, "Expected task to be initialized, but it was nil")
+
+		// Create a buffered done channel to signal job completion.
+		// This channel will be used to notify when the job is done.
+		doneCh := make(chan struct{}, 1)
+		// Set the done channel for the task using the SetDoneChannel method.
+		// The method should return no error if the done channel is valid.
+		_ = task.SetDoneChannel(doneCh)
+
+		// Create a wait group to synchronize job completion.
+		// The wait group will be used to wait for the task to complete.
+		wg := &sync.WaitGroup{}
+		// Assign the wait group to the job instance.
+		// This allows the task to signal completion to the wait group.
+		_ = task.SetWaitGroup(wg)
+
+		// Create a context without a timeout to use for the task.
+		// The context is used for task processing and cancellation.
+		ctx := context.Background()
+		// Set the parent context of the task to the newly created context.
+		// This context will be used in task processing.
+		_ = task.SetContext(ctx)
+
+		// Mock the Processing method to return true when called with the context and task.
+		// This simulates the job processing method returning a successful result.
+		mockProcessing.On("Processing", mock.Anything, inputProcessingData).Return(true)
+
+		// Add to the wait group to track job execution.
+		// This ensures the wait group waits for the job to complete.
+		wg.Add(1)
+
+		// Start the job in a separate Goroutine to allow asynchronous execution.
+		// This allows the task to run concurrently with the test.
+		go task.Run()
+
+		// Wait for the job to complete or timeout.
+		// This select block waits for the job to signal completion or for a timeout.
+		select {
+		case <-doneCh:
+			// Attempt to receive from the `stopCh` channel to check if it's closed.
+			// In Go, receiving from a closed channel returns the zero value immediately and `ok` is false.
+			// If the channel is still open, `ok` would be true, indicating that the task is still running.
+			_, ok := <-task.stopCh
+
+			// Assert that `ok` is false, meaning that the `stopCh` should be closed at this point.
+			// A closed `stopCh` indicates that the task has completed its execution and signaled completion.
+			// If the channel is still open (`ok` is true), this would imply the task has not finished properly, and the test should fail.
+			assert.False(t, ok, "Expected stop channel to be closed, indicating job completion")
+
+			// Set an error on the job instance for testing purposes.
+			// Here we are not setting an error, so we expect no error.
+			// This ensures that the job's error handling logic is functioning as expected.
+			err := task.GetError()
+
+			// Assert that there is no error associated with the job.
+			// This checks that the job's error handling logic does not report any error.
+			// The assertion will fail if job.GetError() returns a non-nil error.
+			assert.NoError(t, err, "Expected no error to be reported by job.GetError()")
+
+		case <-time.After(timeout):
+			// If the task takes longer than the timeout duration, the test should fail.
+			// This indicates that the task did not complete in time, which is a test failure.
+			t.Fatal("Timeout waiting for task to complete")
+		}
 	})
 }
