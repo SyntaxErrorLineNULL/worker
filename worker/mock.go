@@ -43,7 +43,7 @@ func (m *MockProcessingLongTask) Processing(ctx context.Context, _ interface{}) 
 // ErrorHandler is a mock implementation of the error handling method.
 // This method is a no-op (no operation) in this mock, as it is not used in the current test scenarios.
 // In a real-world implementation, this method would handle any errors encountered during the processing.
-func (m *MockProcessingLongTask) ErrorHandler(ctx context.Context, input interface{}) {
+func (m *MockProcessingLongTask) ErrorHandler(_ context.Context, _ interface{}) {
 	// No operation in this mock implementation.
 }
 
