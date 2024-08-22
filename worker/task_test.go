@@ -465,4 +465,105 @@ func TestTask(t *testing.T) {
 		// This tests that the Stop method correctly handles multiple invocations, especially if there are safeguards in place (e.g., using sync.Once).
 		task.Stop()
 	})
+
+	// TaskStop tests the behavior of the Task's Stop method during execution.
+	// This test verifies that the task correctly stops when the Stop method is called,
+	// that the stop channel (`stopCh`) is properly closed, and that the task's processing
+	// logic behaves as expected when interrupted by a stop signal.
+	t.Run("TaskStop", func(t *testing.T) {
+		// Define the worker timeout duration for the test.
+		// This is the maximum amount of time we allow for the task to complete.
+		timeout := 5 * time.Second
+
+		// Initialize input data for the processing function.
+		// `inputProcessingData` represents an example integer input (in this case, `222`)
+		// that will be passed to the processing function. The integer is cast to `int32`
+		// to match the expected data type used by the processing function.
+		inputProcessingData := int32(222)
+
+		// Define the error handler input as a string.
+		// `inputErrorHandler` is set to "error handler" and is intended to be used
+		// as the input for the error handling function in the task.
+		// This string will simulate or represent an identifier or message to be processed by the error handler.
+		inputErrorHandler := "error handler"
+
+		// Create an instance of the mock processing task with a specified timeout.
+		// This mock simulates a long-running task for testing purposes.
+		mockProcessingWithLongTask := &MockProcessingLongTask{timeout: timeout}
+
+		// Create a new task instance with the specified timeout, name, processing function, and input data.
+		// This task simulates a job that will be processed within the test.
+		task := NewTask(timeout, "test-task", mockProcessingWithLongTask, inputProcessingData, inputErrorHandler)
+		// Assert that the task was successfully created.
+		// If the task is nil, it indicates a problem with task initialization.
+		assert.NotNil(t, task, "Expected task to be initialized, but it was nil")
+
+		// Create a wait group to synchronize job completion.
+		// The wait group will be used to wait for the task to complete.
+		wg := &sync.WaitGroup{}
+		// Assign the wait group to the job instance.
+		// This allows the task to signal completion to the wait group.
+		_ = task.SetWaitGroup(wg)
+
+		// Create a context without a timeout to use for the task.
+		// The context is used for task processing and cancellation.
+		ctx := context.Background()
+		// Set the parent context of the task to the newly created context.
+		// This context will be used in task processing.
+		_ = task.SetContext(ctx)
+
+		// Increment the WaitGroup counter by 1.
+		// This indicates that there is a new goroutine (task) that needs to be waited on.
+		// The WaitGroup counter must be incremented for each goroutine that will be started,
+		// so that the main test logic can properly wait for all of them to complete.
+		wg.Add(1)
+
+		// Start a new goroutine to run the task concurrently.
+		// Goroutines allow tasks to execute in parallel with other operations, making it possible
+		// to simulate concurrent processing and handle asynchronous operations within tests.
+		go func() {
+			// Introduce a delay of 1 second before executing the task.
+			// This simulates a scenario where there is a delay before the task starts processing.
+			// The delay ensures that the task runs after a brief wait, allowing for other operations
+			// or conditions to be set up beforehand.
+			<-time.After(1 * time.Second)
+
+			// Run the task in the separate goroutine.
+			// This invokes the `Run()` method of the task, which starts the task's processing logic.
+			// Running the task in a separate goroutine allows it to execute concurrently with
+			// other operations, such as waiting for completion or handling timeouts.
+			task.Run() // Begin the task processing logic in the background.
+		}()
+
+		// Wait for a brief moment (1 second) before stopping the task.
+		// This simulates a scenario where the task is stopped shortly after it starts.
+		// It introduces a small delay to allow the task to start processing before being asked to stop.
+		<-time.After(1 * time.Second)
+
+		// Gracefully stop the task by calling the `Stop()` method.
+		// This sends a signal through the `stopCh` channel to indicate that the task should halt its execution.
+		task.Stop()
+
+		// Use a select statement to either receive a signal from the stop channel or timeout.
+		// This ensures that we properly handle the task's stopping behavior and confirm the channel's closure.
+		select {
+		case _, ok := <-task.stopCh:
+			// Attempt to receive a value from the `stopCh` channel.
+			// The `ok` variable will be false if the channel is closed, which is the expected behavior after `Stop()` is called.
+			assert.False(t, ok, "Expected stopCh to be closed, but it was not")
+
+			// Introduce a short delay to ensure that asynchronous operations have time to complete.
+			// This delay allows the stop signal to propagate and any remaining processing to finalize.
+			<-time.After(10 * time.Millisecond)
+
+			// Assert that the counter in the mock processing task matches the expected value.
+			// This verifies that the task was properly stopped and that the mock processing function was executed as expected.
+			assert.Equal(t, MockProcessingLongTaskCounter, mockProcessingWithLongTask.Counter(), "Task processing counter did not match expected value after Stop() was called")
+		case <-time.After(2 * timeout):
+			// If no signal is received from `stopCh` within `2 * timeout` duration, this case will trigger, indicating a timeout.
+			// This is a safeguard to ensure the test doesn't hang indefinitely if something goes wrong.
+			t.Fatal("timeout waiting for job to complete")
+		}
+
+	})
 }
