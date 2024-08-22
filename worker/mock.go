@@ -29,6 +29,7 @@ type MockProcessingLongTask struct {
 func (m *MockProcessingLongTask) Processing(ctx context.Context, _ interface{}) {
 	select {
 	case <-ctx.Done():
+		fmt.Println("\nProcessing context done")
 		// The context was canceled before the timeout elapses.
 		// Increment the contextDone counter by MockProcessingLongTaskCounter to indicate interruption.
 		m.contextDone.Add(MockProcessingLongTaskCounter)
@@ -36,7 +37,7 @@ func (m *MockProcessingLongTask) Processing(ctx context.Context, _ interface{}) 
 	case <-time.After(m.timeout):
 		// Simulate long processing by blocking for the duration specified in m.timeout.
 		// This is done using time.After to block the goroutine until the timeout has elapsed.
-		fmt.Println("timeout")
+		fmt.Println("\nProcessing timeout")
 	}
 }
 
