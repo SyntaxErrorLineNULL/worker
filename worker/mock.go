@@ -70,12 +70,10 @@ type MockProcessingWithPanic struct{}
 // This method is used to test the behavior of the system when a panic occurs
 // during processing. It returns false, but the primary purpose is to trigger
 // a panic with a predefined error message to test panic recovery mechanisms.
-func (m *MockProcessingWithPanic) Processing(_ context.Context, _ interface{}) bool {
+func (m *MockProcessingWithPanic) Processing(_ context.Context, _ interface{}) {
 	// This mock implementation deliberately causes a panic with a specific error message.
 	// It helps simulate and test how the system handles unexpected errors during processing.
 	panic(errors.New("mock panic"))
-	// The following line will not be reached due to the panic above.
-	return false
 }
 
 // ErrorHandler provides a mock implementation of an error handling function.
