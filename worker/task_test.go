@@ -411,4 +411,58 @@ func TestTask(t *testing.T) {
 			t.Fatal("timeout waiting for job to complete")
 		}
 	})
+
+	// RecallingStop tests the behavior of the Stop method on the Task instance, specifically
+	// focusing on ensuring that the stop channel (stopCh) is properly closed and that calling
+	// Stop multiple times behaves as expected. The test verifies that the channel is closed
+	// correctly, allowing subsequent reads to be non-blocking, and checks that the Stop method
+	// can be safely called multiple times without causing issues.
+	t.Run("RecallingStop ", func(t *testing.T) {
+		// Create a new Task instance with a stop channel (stopCh) initialized.
+		// The stop channel is used to signal when the task should stop processing.
+		task := &Task{stopCh: make(chan struct{}, 1)}
+
+		// Declare a sync.WaitGroup to synchronize the completion of a goroutine.
+		// The WaitGroup is used to ensure that the main function waits for the goroutine to finish.
+		var wg sync.WaitGroup
+		// Increment the WaitGroup counter by 1.
+		// This indicates that there is one goroutine that the test needs to wait for.
+		wg.Add(1)
+
+		// Start a new goroutine to simulate concurrent task behavior.
+		// This goroutine will block until it receives a signal from the stop channel.
+		go func() {
+			// Ensure that the WaitGroup counter is decremented when the goroutine completes.
+			// This allows the main test function to know when the goroutine has finished its execution.
+			defer wg.Done()
+
+			// Wait for a signal from the stop channel (stopCh).
+			// The goroutine will block here until the stop channel receives a signal, indicating that the task is stopping.
+			<-task.stopCh
+		}()
+
+		// Call the Stop method on the task to signal that it should stop processing.
+		// This sends a signal through the stop channel to indicate that the task should stop.
+		task.Stop()
+
+		// Wait for the goroutine to finish its execution.
+		// The WaitGroup will block until the goroutine calls Done(), ensuring that the goroutine has received the stop signal.
+		wg.Wait()
+
+		// Use a select statement to check the state of the stop channel after the Stop method is called.
+		// This is done to verify that the stop channel has been properly closed by the Stop method.
+		select {
+		case <-task.stopCh:
+			// Success, stopCh was closed as expected.
+			// The case branch will be executed if the stop channel is closed, indicating that the Stop method worked correctly.
+		default:
+			// Fail the test if the stop channel is still open.
+			// If the stop channel is not closed, the test will fail with this message, indicating that the Stop method did not work as expected.
+			t.Fatal("stopCh should be closed, but it's not")
+		}
+
+		// Call Stop again to ensure that subsequent calls to Stop are handled correctly.
+		// This tests that the Stop method correctly handles multiple invocations, especially if there are safeguards in place (e.g., using sync.Once).
+		task.Stop()
+	})
 }
