@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"time"
@@ -58,4 +59,37 @@ func (m *MockProcessingLongTask) Result() chan interface{} {
 // how many times the task was interrupted by a context cancellation during testing.
 func (m *MockProcessingLongTask) Counter() int32 {
 	return m.contextDone.Load()
+}
+
+// MockProcessingWithPanic is a mock implementation of the Processing interface.
+// It is used in tests to simulate scenarios where the Processing method
+// deliberately causes a panic to test error handling and recovery mechanisms.
+type MockProcessingWithPanic struct{}
+
+// Processing simulates a processing operation and deliberately causes a panic.
+// This method is used to test the behavior of the system when a panic occurs
+// during processing. It returns false, but the primary purpose is to trigger
+// a panic with a predefined error message to test panic recovery mechanisms.
+func (m *MockProcessingWithPanic) Processing(_ context.Context, _ interface{}) bool {
+	// This mock implementation deliberately causes a panic with a specific error message.
+	// It helps simulate and test how the system handles unexpected errors during processing.
+	panic(errors.New("mock panic"))
+	// The following line will not be reached due to the panic above.
+	return false
+}
+
+// ErrorHandler provides a mock implementation of an error handling function.
+// In this mock, the ErrorHandler method does not perform any actual error handling.
+// It is included to satisfy the interface but does not implement any functionality.
+func (m *MockProcessingWithPanic) ErrorHandler(_ context.Context, _ interface{}) {
+	// No actual error handling is performed in this mock implementation.
+	// This method is provided to fulfill the interface requirements and
+	// does not affect the test scenarios directly.
+}
+
+// Result is a mock implementation of a method that would return the result of the processing.
+// In this mock, it simply returns nil because the result handling is not the focus of the test scenarios involving this mock task.
+func (m *MockProcessingWithPanic) Result() chan interface{} {
+	// Return nil as no result handling is implemented in this mock.
+	return nil
 }
