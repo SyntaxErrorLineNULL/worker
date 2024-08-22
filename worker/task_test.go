@@ -306,4 +306,109 @@ func TestTask(t *testing.T) {
 			t.Fatal("Timeout waiting for task to complete")
 		}
 	})
+
+	// ProcessingWithPanic tests the behavior of the task processing when the processing function
+	// is designed to trigger a panic. This test ensures that the task properly handles and reports
+	// the panic error. The test verifies that the error handling mechanism works correctly,
+	// capturing and reporting the panic with the expected error message. Additionally, it checks
+	// if the task correctly signals completion or if a timeout occurs.
+	t.Run("ProcessingWithPanic", func(t *testing.T) {
+		// Define the worker timeout duration for the test.
+		// This is the maximum amount of time we allow for the task to complete.
+		timeout := 3 * time.Second
+
+		// Initialize input data for the processing function.
+		// `inputProcessingData` represents an example integer input (in this case, `222`)
+		// that will be passed to the processing function. The integer is cast to `int32`
+		// to match the expected data type used by the processing function.
+		inputProcessingData := int32(222)
+
+		// Define the error handler input as a string.
+		// `inputErrorHandler` is set to "error handler" and is intended to be used
+		// as the input for the error handling function in the task.
+		// This string will simulate or represent an identifier or message to be processed by the error handler.
+		inputErrorHandler := "error handler"
+
+		// Create a mock processing task that simulates a panic during processing.
+		// The mock is designed to trigger a panic to test the task's error handling.
+		mockProcessingWithPanic := &MockProcessingWithPanic{}
+
+		// Create a new task instance with the specified timeout, name, processing function, and input data.
+		// This task simulates a job that will be processed within the test.
+		task := NewTask(timeout, "test-task", mockProcessingWithPanic, inputProcessingData, inputErrorHandler)
+		// Assert that the task was successfully created.
+		// If the task is nil, it indicates a problem with task initialization.
+		assert.NotNil(t, task, "Expected task to be initialized, but it was nil")
+
+		// Create a buffered done channel to signal job completion.
+		// This channel will be used to notify when the job is done.
+		doneCh := make(chan struct{}, 1)
+		// Set the done channel for the task using the SetDoneChannel method.
+		// The method should return no error if the done channel is valid.
+		_ = task.SetDoneChannel(doneCh)
+
+		// Create a wait group to synchronize job completion.
+		// The wait group will be used to wait for the task to complete.
+		wg := &sync.WaitGroup{}
+		// Assign the wait group to the job instance.
+		// This allows the task to signal completion to the wait group.
+		_ = task.SetWaitGroup(wg)
+
+		// Create a context without a timeout to use for the task.
+		// The context is used for task processing and cancellation.
+		ctx := context.Background()
+		// Set the parent context of the task to the newly created context.
+		// This context will be used in task processing.
+		_ = task.SetContext(ctx)
+
+		// Increment the WaitGroup counter by 1.
+		// This indicates that there is a new goroutine (task) that needs to be waited on.
+		// The WaitGroup counter must be incremented for each goroutine that will be started,
+		// so that the main test logic can properly wait for all of them to complete.
+		wg.Add(1)
+
+		// Start a new goroutine to run the task concurrently.
+		// Goroutines allow tasks to execute in parallel with other operations, making it possible
+		// to simulate concurrent processing and handle asynchronous operations within tests.
+		go func() {
+			// Introduce a delay of 1 second before executing the task.
+			// This simulates a scenario where there is a delay before the task starts processing.
+			// The delay ensures that the task runs after a brief wait, allowing for other operations
+			// or conditions to be set up beforehand.
+			<-time.After(1 * time.Second)
+
+			// Run the task in the separate goroutine.
+			// This invokes the `Run()` method of the task, which starts the task's processing logic.
+			// Running the task in a separate goroutine allows it to execute concurrently with
+			// other operations, such as waiting for completion or handling timeouts.
+			task.Run() // Begin the task processing logic in the background.
+		}()
+
+		select {
+		case <-doneCh:
+			// Retrieve any error that may have been recorded by the task.
+			// This checks whether the task encountered an error during its execution,
+			// such as a panic or other runtime error, and allows for verification of error handling.
+			err := task.GetError()
+
+			// Assert that the mock processing function panics with the expected error message.
+			// This ensures that the panic is properly triggered and that the error message matches the expected value.
+			// The test checks if calling the `Processing` method on `mockProcessingWithPanic`
+			// with nil context and input results in a panic with the message "mock panic".
+			assert.PanicsWithError(t, "mock panic", func() {
+				// Call the `Processing` method on the mock, which is expected to panic.
+				// This will simulate an error scenario where the processing function fails.
+				mockProcessingWithPanic.Processing(nil, nil)
+			}, "Expected panic with message 'mock panic' not triggered")
+
+			// Assert that the error retrieved from the task matches the expected error message.
+			// This verifies that the error captured during task execution (if any) is exactly the one expected.
+			// The error message should match "mock panic" to confirm that the task handled the panic correctly.
+			assert.EqualError(t, err, "mock panic", "Task did not capture the expected panic error")
+		case <-time.After(timeout):
+			// If no signal is received from `stopCh` within `2 * timeout` duration, this case will trigger, indicating a timeout.
+			// This is a safeguard to ensure the test doesn't hang indefinitely if something goes wrong.
+			t.Fatal("timeout waiting for job to complete")
+		}
+	})
 }
