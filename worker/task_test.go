@@ -578,4 +578,129 @@ func TestTask(t *testing.T) {
 		}
 
 	})
+
+	// DoneParentContext tests the behavior of the task when the parent context is canceled
+	// before the task completes its processing. It verifies that the task properly handles
+	// context cancellation by ensuring it stops processing, closes the stop channel, and
+	// increments the contextDone and error handler counters correctly.
+	t.Run("DoneParentContext", func(t *testing.T) {
+		// Create a parent context and its cancel function for controlling the test execution.
+		// This parent context will be used for the task and allows cancellation to simulate context timeout or interruption.
+		parentCtx, cancelParentCtx := context.WithCancel(context.Background())
+
+		// Define the worker timeout duration for the test.
+		// This is the maximum amount of time we allow for the task to complete.
+		timeout := 10 * time.Second
+
+		// Initialize input data for the processing function.
+		// `inputProcessingData` represents an example integer input (in this case, `222`)
+		// that will be passed to the processing function. The integer is cast to `int32`
+		// to match the expected data type used by the processing function.
+		inputProcessingData := int32(222)
+
+		// Define the error handler input as a string.
+		// `inputErrorHandler` is set to "error handler" and is intended to be used
+		// as the input for the error handling function in the task.
+		// This string will simulate or represent an identifier or message to be processed by the error handler.
+		inputErrorHandler := "error handler"
+
+		// Create an instance of the mock processing task with a specified timeout.
+		// This mock simulates a long-running task for testing purposes.
+		mockProcessingWithLongTask := &MockProcessingLongTask{timeout: timeout}
+
+		// Create a new task instance with the specified timeout, name, processing function, and input data.
+		// This task simulates a job that will be processed within the test.
+		task := NewTask(timeout, "test-task", mockProcessingWithLongTask, inputProcessingData, inputErrorHandler)
+		// Assert that the task was successfully created.
+		// If the task is nil, it indicates a problem with task initialization.
+		assert.NotNil(t, task, "Expected task to be initialized, but it was nil")
+
+		// Create a buffered done channel to signal job completion.
+		// This channel will be used to notify when the job is done.
+		doneCh := make(chan struct{}, 1)
+		// Set the done channel for the task using the SetDoneChannel method.
+		// The method should return no error if the done channel is valid.
+		_ = task.SetDoneChannel(doneCh)
+
+		// Create a wait group to synchronize job completion.
+		// The wait group will be used to wait for the task to complete.
+		wg := &sync.WaitGroup{}
+		// Assign the wait group to the job instance.
+		// This allows the task to signal completion to the wait group.
+		_ = task.SetWaitGroup(wg)
+
+		// Set the parent context of the task to the newly created context.
+		// This context will be used in task processing.
+		_ = task.SetContext(parentCtx)
+
+		// Increment the WaitGroup counter by 1.
+		// This indicates that there is a new goroutine (task) that needs to be waited on.
+		// The WaitGroup counter must be incremented for each goroutine that will be started,
+		// so that the main test logic can properly wait for all of them to complete.
+		wg.Add(1)
+
+		// Start a new goroutine to run the task concurrently.
+		// Goroutines allow tasks to execute in parallel with other operations, making it possible
+		// to simulate concurrent processing and handle asynchronous operations within tests.
+		go func() {
+			// Run the task in the separate goroutine.
+			// This invokes the `Run()` method of the task, which starts the task's processing logic.
+			// Running the task in a separate goroutine allows it to execute concurrently with
+			// other operations, such as waiting for completion or handling timeouts.
+			task.Run() // Begin the task processing logic in the background.
+		}()
+
+		// Wait for a short duration to allow the task to start processing.
+		// This delay ensures that the task has time to initiate before the parent context is canceled.
+		<-time.After(50 * time.Millisecond)
+		// Cancel the parent context to simulate an external cancellation or timeout.
+		// This action will trigger the task to stop its execution if it is still running.
+		cancelParentCtx()
+
+		// Use a select statement to either receive a signal from the stop channel or timeout.
+		// This ensures that we properly handle the task's stopping behavior and confirm the channel's closure.
+		select {
+		case <-doneCh:
+			// Introduce a short delay to ensure that asynchronous operations have time to complete.
+			// This delay allows the stop signal to propagate and any remaining processing to finalize.
+			<-time.After(10 * time.Millisecond)
+
+			select {
+			// Attempt to receive from the `stopCh` channel to check if it's closed.
+			// In Go, when receiving from a closed channel, the operation will return the zero value
+			// of the channel's type immediately and the second value (`ok`) will be false.
+			// This behavior allows us to determine if the channel has been closed by checking the `ok` value.
+			case <-task.stopCh:
+				// Attempt to receive from the `stopCh` channel to check if it's closed.
+				// In Go, receiving from a closed channel returns the zero value immediately and `ok` is false.
+				// If the channel is still open, `ok` would be true, indicating that the task is still running.
+				_, ok := <-task.stopCh
+
+				// Assert that `ok` is false, meaning that the `stopCh` should be closed at this point.
+				// A closed `stopCh` indicates that the task has completed its execution and signaled completion.
+				// If the channel is still open (`ok` is true), this would imply the task has not finished properly, and the test should fail.
+				assert.False(t, ok, "Expected stop channel to be closed, indicating job completion")
+			default:
+				// The `default` case is executed if none of the other cases in the select statement are ready.
+				// This provides a non-blocking path, ensuring that the select statement can proceed
+				// without being stuck waiting for an input from the channels. In this context, it effectively
+				// does nothing and allows the test to continue without blocking.
+			}
+
+			// Check that the ErrorHandler method was called and correctly updated the `errorHandlerContextDone` counter.
+			// This verifies that the error handler was triggered by the cancellation and that the counter was incremented as expected.
+			assert.Equal(t, MockProcessingLongTaskErrorHandlerCounter, mockProcessingWithLongTask.ErrorHandlerCounter(),
+				"Expected ErrorHandlerCounter to match MockProcessingLongTaskErrorHandlerCounter after context cancellation")
+
+			// Check that the context was completed, and the `contextDone` counter was updated.
+			// This verifies that the task's processing logic responded to the context cancellation by updating the counter appropriately.
+			assert.Equal(t, MockProcessingLongTaskCounter, mockProcessingWithLongTask.Counter(),
+				"Expected Counter to match MockProcessingLongTaskCounter after context cancellation")
+
+		case <-time.After(2 * timeout):
+			// If no signal is received from `stopCh` within `2 * timeout` duration, this case will trigger, indicating a timeout.
+			// This is a safeguard to ensure the test doesn't hang indefinitely if something goes wrong.
+			t.Fatal("timeout waiting for job to complete")
+		}
+	})
 }
