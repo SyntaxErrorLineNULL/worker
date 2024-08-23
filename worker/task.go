@@ -3,61 +3,62 @@ package worker
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 	"worker"
 )
 
+// Task is a struct that encapsulates the execution logic of a concurrent task.
+// It manages task execution, including timeout, error handling, and coordination
+// with external components through contexts, channels, and WaitGroups.
 type Task struct {
-	// parentCtx is the parent context passed to the job.
+	// parentCtx is the parent context passed to the task.
+	// This context is used as the base context for the task's execution and can be used to propagate cancellation signals.
 	parentCtx context.Context
-	// Job name, for logging
+	// name is the name of the task, primarily used for logging purposes.
+	// It helps in identifying and tracking the task in logs.
 	name string
-	// timeout is the maximum execution time for "long" tasks.
+	// timeout is the maximum execution time allowed for "long" tasks.
+	// If the task takes longer than this duration, it will be forcefully stopped.
 	timeout time.Duration
 	// processing is a module for processing the task we received, each module implements the Processing interface,
 	// Task receives the task and the necessary module to run it.
 	processing worker.Processing
-
-	processingInput             interface{}
+	// processingInput holds the input data required by the processing module to execute the task.
+	processingInput interface{}
+	// processingErrorHandlerInput holds the input data required by the error handler.
+	// This is used if the task encounters an error or needs to perform compensatory actions after a failure.
 	processingErrorHandlerInput interface{}
-
-	processingOutputCh chan interface{}
-	processingErrorCh  chan error
-
-	processingErrorHandlerOutputCh chan interface{}
-	processingErrorHandlerErrorCh  chan error
-
-	// doneCh this is signaling channel for external handlers about job completion
+	// doneCh is a signaling channel used to notify external handlers when the task is complete.
+	// It's an optional channel, primarily used for coordinating task completion with other processes.
 	doneCh chan<- struct{}
-	// wg is a WaitGroup to wait for the job to complete.
-	// only necessary for controlled tasks
+	// wg is a WaitGroup that is used to wait for the task to complete.
+	// It is only necessary for tasks that require controlled execution, ensuring that all parts of the task finish before proceeding.
 	wg *sync.WaitGroup
-	// stopCh this is channel for signaling job termination.
+	// stopCh this is channel for signaling task termination.
 	// In case of uncontrolled task's timeout <= 0 will not work, in case of controlled tasks it
-	// will close the context and the handler will not be able to do its job.
+	// will close the context and the handler will not be able to do its task.
 	stopCh chan struct{}
-	// stopOnce ensures the stopCh is closed only once.
+	// stopOnce is used to ensure that the stopCh is closed only once.
+	// This is important to prevent multiple close operations, which could cause a panic.
 	stopOnce sync.Once
 	// err is a channel to receive error messages, in case of panic triggers
 	// it will help prevent processing crash by simply passing the error to the worker for logging.
 	err error
 }
 
+// NewTask initializes a new Task instance with the provided parameters.
+// The function takes the maximum timeout, task name, processing module, and inputs for processing and error handling.
 func NewTask(timeout time.Duration, taskName string, processing worker.Processing, processingInput, errorHandlerInput interface{}) *Task {
 	return &Task{
-		timeout:                        timeout,
-		name:                           taskName,
-		processing:                     processing,
-		processingInput:                processingInput,
-		processingErrorHandlerInput:    errorHandlerInput,
-		processingOutputCh:             make(chan interface{}, 1),
-		processingErrorCh:              make(chan error, 1),
-		processingErrorHandlerOutputCh: make(chan interface{}, 1),
-		processingErrorHandlerErrorCh:  make(chan error, 1),
-		// def task error
-		err:    nil,
-		stopCh: make(chan struct{}, 1),
+		timeout:                     timeout,
+		name:                        taskName,
+		processing:                  processing,
+		processingInput:             processingInput,
+		processingErrorHandlerInput: errorHandlerInput,
+		err:                         nil,
+		stopCh:                      make(chan struct{}, 1),
 	}
 }
 
@@ -125,92 +126,139 @@ func (t *Task) SetContext(ctx context.Context) error {
 	return nil
 }
 
+// GetError returns a channel that can be used to receive error messages.
+// In case of panic, the worker will be able to log the error in his or her own account,
+// which can help when looking for problems.
+func (t *Task) GetError() error {
+	return t.err
+}
+
 // GetName returns the name of the task.
 // This method retrieves the name assigned to the task instance.
 func (t *Task) String() string {
 	return t.name
 }
 
+// Run orchestrates the execution of a task with proper lifecycle management using contexts.
+// It handles both short and long-running tasks, manages execution time through context timeouts,
+// and ensures proper cleanup and error handling.
 func (t *Task) Run() {
 	// Defer cleanup steps.
 	defer func() {
-		// Recover from any panic in the job and report it.
+		// Recover from any panic that occurs during the task's execution.
+		// This ensures that the task does not crash the entire application if a panic occurs.
 		if rec := recover(); rec != nil {
-			err := worker.GetRecoverError(rec)
-			if err != nil {
+			// Convert the recovered panic into an error using a helper function.
+			// This step captures the panic and translates it into an error that can be handled.
+			if err := worker.GetRecoverError(rec); err != nil {
+				// Store the error in the task for later retrieval.
 				t.err = err
 			}
+
 		}
 
-		return
-	}()
+		// Call the Stop method to ensure that the task is properly stopped.
+		// This includes closing the stop channel stopCh and performing any necessary cleanup.
+		t.Stop()
 
-	// Defer function to signal job completion and decrement the wait group.
-	defer func() {
-		// Signal the completion to the doneCh channel if available.
+		// Signal the completion of the task to the doneCh` channel, if it is available.
+		// Sending an empty struct on doneCh notifies any listeners that the task has finished.
 		if t.doneCh != nil {
 			t.doneCh <- struct{}{}
 		}
 
-		// Decrement the wait group if available.
+		// Decrement the wait group wg counter, if it is available.
+		// This signals that the task's goroutine has completed its work, allowing any waiting processes to proceed.
 		if t.wg != nil {
 			t.wg.Done()
 		}
 
+		// Return from the deferred function.
+		// This concludes the cleanup and recovery process, ensuring that the `Run` method can complete gracefully.
 		return
 	}()
 
-	// Synchronize execution of goroutines using a done channel.
-	done := make(chan struct{}, 1)
-
+	// Check if the task has no timeout set (i.e., timeout is zero or negative).
 	if t.timeout <= 0 {
-		// Add 1 to the wait group to track the execution of the main function.
-		t.wg.Add(1)
-
-		go func() {
-			// Initialize the processing with the provided context.
-			if err := t.initProcessing(t.parentCtx, done); err != nil {
-				t.err = err
-			}
-
-			return
-		}()
-
+		// Start the task's processing logic in a new Goroutine to allow it to run concurrently with other tasks.
+		go t.processing.Processing(t.parentCtx, t.processingInput)
+		// Since there's no timeout, return from the Run method immediately after launching the goroutine.
 		return
 	}
 
 	// Create a new context with a timeout based on workerTimeout.
-	jobCtx, cancel := context.WithTimeout(t.parentCtx, t.timeout)
-	defer cancel()
+	taskContext, cancel := context.WithTimeout(t.parentCtx, t.timeout)
 
-	// Add 1 to the wait group to track the execution of the main function.
-	t.wg.Add(1)
+	// Initialize a done channel with a buffer of 1, which will be used to signal when the task's processing is complete.
+	done := make(chan struct{}, 1)
+
+	// If a WaitGroup (wg) is associated with this task, increment its counter to track the new goroutine that will be started.
+	if t.wg != nil {
+		// Increase the counter in the wait group to indicate that another goroutine is starting.
+		t.wg.Add(1)
+	}
 
 	// Start a Goroutine to execute the main function with the created context and done channel.
 	go func() {
-		// Initialize the processing with the provided context.
-		if err := t.initProcessing(jobCtx, done); err != nil {
+		defer func() {
+			// Decrement the wait group to signal task completion.
+			if t.wg != nil {
+				t.wg.Done()
+			}
+			// Return from the function. Default value of err is nil if no panic occurs.
+			return
+		}()
+
+		// Call the initProcessing method to start the task's main processing logic, passing the context and done channel.
+		// If an error occurs during processing, store it in the task's error field.
+		if err := t.initProcessing(taskContext, done); err != nil {
+			// Store the error that occurred during task processing.
 			t.err = err
 		}
+
+		// Default return value, indicating error stat.
 		return
 	}()
 
 	// Select block to wait for the completion of the main function or the timeout.
 	select {
-	case <-done:
-		// Primary function completed within the allowed time.
-		// Close the done channel and continue with the rest of your program.
-		close(done)
+	// A signal was received from the stop channel stopCh, indicating that the task should stop its execution.
+	// This signal is typically sent when the Stop method is called, which means the task is being explicitly requested to terminate.
+	case <-t.stopCh:
+		fmt.Println("\nStop ch")
+		// Cancel the context to immediately stop any ongoing or pending operations associated with this task.
+		// This ensures that the task's processing halts as soon as possible.
+		cancel()
+
+		// Return from the `Run` method, terminating the task's execution.
+		// Exiting the method signals that the task has acknowledged the stop request and is no longer running.
 		return
 
-	case <-jobCtx.Done():
-		// Why a new context and not use j.parentCtx / jobCtx?
+	// A signal was received from the done channel, indicating that the primary function has completed its execution.
+	// This means the task finished its processing before the timeout or stop signal occurred.
+	case <-done:
+		fmt.Println("\nDone ch")
+		// Close the done channel to signal that no more events will occur on this channel.
+		// Closing the channel is an important step to clean up resources and prevent any further sends on this channel.
+		close(done)
+		// Cancel the context to stop any remaining work associated with this task.
+		// This is a cleanup step to ensure that no further actions are taken by the task now that it has completed.
+		cancel()
+		// Return from the Run method, as the task has successfully completed.
+		// Exiting the method indicates that the task's lifecycle is finished.
+		return
+
+	// If the task's context times out or is canceled, this case will be triggered.
+	// This happens when the task either exceeds the allowed time (timeout) or if the parent context is canceled.
+	case <-taskContext.Done():
+		// If the task's context times out or is canceled, this case will be triggered.
+		// Cancel the task's context to halt any ongoing processing.
+		cancel()
+
+		// Why a new context and not use t.parentCtx / taskContext?
 		// The point is that if the handler context is completed, but Processing itself is not completed,
 		// ErrorHandler is called, and it can execute its logic with the new context.
-		errorHandlerResult, errorHandlerErr := t.processing.ErrorHandler(context.Background(), t.processingErrorHandlerInput)
-
-		t.processingErrorHandlerOutputCh <- errorHandlerResult
-		t.processingErrorHandlerErrorCh <- errorHandlerErr
+		t.processing.ErrorHandler(context.Background(), t.processingErrorHandlerInput)
 
 		return
 	}
@@ -220,34 +268,29 @@ func (t *Task) Run() {
 // This method is needed to prevent overlapping of panic catching. It starts processing
 // in this method, and in case of an error, the local recover will be triggered.
 // The global error processing will be triggered in the Run method.
-func (t *Task) initProcessing(ctx context.Context, done chan struct{}) (err error) {
+func (t *Task) initProcessing(ctx context.Context, doneCh chan struct{}) (err error) {
 	defer func() {
-		// Recover from any panic in the job and report it.
+		// Recover from any panic that occurs during the task's execution.
+		// This ensures that the task does not crash the entire application if a panic occurs.
 		if rec := recover(); rec != nil {
-			// Convert the recovered panic into an error using internal.GetRecoverError.
+			// Convert the recovered panic into an error using a helper function.
+			// This step captures the panic and translates it into an error that can be handled.
 			err = worker.GetRecoverError(rec)
-			return
 		}
 
-		// Return from the function. Default value of err is nil if no panic occurs.
-		return
-	}()
+		// Notify that the task has completed, whether successfully or after a panic.
+		// Sending an empty struct to `doneCh` signals that the task's execution is done.
+		doneCh <- struct{}{}
 
-	defer func() {
-		// Decrement the wait group to signal task completion.
-		t.wg.Done()
-		// the task has been completed successfully, which means that we will notify the handler about it.
-		done <- struct{}{}
+		// The return statement is implicit here, as the function ends.
+		// If an error occurred during processing, it will be returned.
 		return
 	}()
 
 	// start a task with a context that will be terminated after timeout,
 	// and processing will not be able to perform any further actions.
 	// Then ErrorHandler with a new context will be triggered, it acts as a compensating action.
-	processingResult, processingError := t.processing.Processing(ctx, t.processingInput)
-
-	t.processingOutputCh <- processingResult
-	t.processingErrorCh <- processingError
+	t.processing.Processing(ctx, t.processingInput)
 
 	// Default return value, indicating error stat.
 	return
@@ -260,13 +303,15 @@ func (t *Task) initProcessing(ctx context.Context, done chan struct{}) (err erro
 func (t *Task) Stop() {
 	// Execute the stop logic only once, even if Stop is called multiple times.
 	t.stopOnce.Do(func() {
-		// Send an empty struct to the stop channel to signal that the job should stop.
-		// This notification allows any goroutines waiting on this channel to detect that the job is stopping.
-		t.stopCh <- struct{}{}
+		if t.stopCh != nil {
+			// Send an empty struct to the stop channel to signal that the job should stop.
+			// This notification allows any goroutines waiting on this channel to detect that the job is stopping.
+			t.stopCh <- struct{}{}
 
-		// Close the stop channel to indicate that no more signals will be sent.
-		// Closing the channel is important for cleanup and to signal all listeners that no further events will occur.
-		close(t.stopCh)
+			// Close the stop channel to indicate that no more signals will be sent.
+			// Closing the channel is important for cleanup and to signal all listeners that no further events will occur.
+			close(t.stopCh)
+		}
 
 		return
 	})
