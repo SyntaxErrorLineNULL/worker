@@ -19,7 +19,7 @@ test: ## Run tests
 generate: ## Generate mocks
 # Check if mockery is installed. If not, install it.
 ifeq (, $(shell which mockery))
-	go install github.com/vektra/mockery/v2@latest
+	go install github.com/vektra/mockery/v2@v2.44.2
 endif
 	# Run go generate to trigger code generation in the project.
 	go generate ./...
