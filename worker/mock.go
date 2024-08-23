@@ -8,16 +8,26 @@ import (
 	"time"
 )
 
-// MockProcessingLongTaskCounter is a constant used to represent the value
-// added to the contextDone counter when the processing is interrupted
-// by a context cancellation. This value is used for testing purposes to
-// verify that the task handles context cancellation correctly.
-const MockProcessingLongTaskCounter = int32(100)
+const (
+	// MockProcessingLongTaskCounter is a constant used to represent the value
+	// added to the contextDone counter when the processing is interrupted
+	// by a context cancellation. This value is used for testing purposes to
+	// verify that the task handles context cancellation correctly.
+	MockProcessingLongTaskCounter = int32(100)
+
+	// MockProcessingLongTaskErrorHandlerCounter represents a fixed value that is added
+	// to the errorHandlerContextDone counter. This is used in testing to check if the error
+	// handler was triggered and how it handles errors.
+	MockProcessingLongTaskErrorHandlerCounter = int32(1000)
+)
 
 // MockProcessingLongTask is a mock implementation of the Processing interface designed to simulate long-running tasks.
 // It is primarily used for testing purposes to validate how a task behaves when it takes a considerable amount of time to complete.
 type MockProcessingLongTask struct {
+	// Counter for tracking context cancellations.
 	contextDone atomic.Int32
+	// Counter for tracking error handler invocations.
+	errorHandlerContextDone atomic.Int32
 	// timeout specifies the duration for which the task should simulate processing.
 	// This duration represents the "long" time that the task will take before completion.
 	timeout time.Duration
@@ -46,6 +56,7 @@ func (m *MockProcessingLongTask) Processing(ctx context.Context, _ interface{}) 
 // In a real-world implementation, this method would handle any errors encountered during the processing.
 func (m *MockProcessingLongTask) ErrorHandler(_ context.Context, _ interface{}) {
 	// No operation in this mock implementation.
+	m.errorHandlerContextDone.Add(MockProcessingLongTaskErrorHandlerCounter)
 }
 
 // Result is a mock implementation of a method that would return the result of the processing.
@@ -60,6 +71,13 @@ func (m *MockProcessingLongTask) Result() chan interface{} {
 // how many times the task was interrupted by a context cancellation during testing.
 func (m *MockProcessingLongTask) Counter() int32 {
 	return m.contextDone.Load()
+}
+
+// ErrorHandlerCounter returns the current value of the `erroHandlerContextDone` counter.
+// This method provides the count of times the `ErrorHandler` was invoked during the execution of
+// the mock task, useful for verifying if error handling was triggered in the test scenarios.
+func (m *MockProcessingLongTask) ErrorHandlerCounter() int32 {
+	return m.errorHandlerContextDone.Load()
 }
 
 // MockProcessingWithPanic is a mock implementation of the Processing interface.
