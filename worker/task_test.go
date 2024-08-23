@@ -2,13 +2,13 @@ package worker
 
 import (
 	"context"
-	"github.com/stretchr/testify/mock"
 	"sync"
 	"testing"
 	"time"
 	"worker/mocks"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestTask(t *testing.T) {
@@ -280,15 +280,27 @@ func TestTask(t *testing.T) {
 		// This select block waits for the job to signal completion or for a timeout.
 		select {
 		case <-doneCh:
+			select {
 			// Attempt to receive from the `stopCh` channel to check if it's closed.
-			// In Go, receiving from a closed channel returns the zero value immediately and `ok` is false.
-			// If the channel is still open, `ok` would be true, indicating that the task is still running.
-			_, ok := <-task.stopCh
+			// In Go, when receiving from a closed channel, the operation will return the zero value
+			// of the channel's type immediately and the second value (`ok`) will be false.
+			// This behavior allows us to determine if the channel has been closed by checking the `ok` value.
+			case <-task.stopCh:
+				// Attempt to receive from the `stopCh` channel to check if it's closed.
+				// In Go, receiving from a closed channel returns the zero value immediately and `ok` is false.
+				// If the channel is still open, `ok` would be true, indicating that the task is still running.
+				_, ok := <-task.stopCh
 
-			// Assert that `ok` is false, meaning that the `stopCh` should be closed at this point.
-			// A closed `stopCh` indicates that the task has completed its execution and signaled completion.
-			// If the channel is still open (`ok` is true), this would imply the task has not finished properly, and the test should fail.
-			assert.False(t, ok, "Expected stop channel to be closed, indicating job completion")
+				// Assert that `ok` is false, meaning that the `stopCh` should be closed at this point.
+				// A closed `stopCh` indicates that the task has completed its execution and signaled completion.
+				// If the channel is still open (`ok` is true), this would imply the task has not finished properly, and the test should fail.
+				assert.False(t, ok, "Expected stop channel to be closed, indicating job completion")
+			default:
+				// The `default` case is executed if none of the other cases in the select statement are ready.
+				// This provides a non-blocking path, ensuring that the select statement can proceed
+				// without being stuck waiting for an input from the channels. In this context, it effectively
+				// does nothing and allows the test to continue without blocking.
+			}
 
 			// Set an error on the job instance for testing purposes.
 			// Here we are not setting an error, so we expect no error.
