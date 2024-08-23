@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -13,6 +14,8 @@ import (
 
 func TestTask(t *testing.T) {
 	t.Parallel()
+
+	defer runtime.GC()
 
 	// Create a new mock instance of the Processing interface using the mocks package.
 	// This mock object simulates the behavior of a Processing interface, allowing you to test how your code interacts with it.
@@ -559,10 +562,16 @@ func TestTask(t *testing.T) {
 		// Use a select statement to either receive a signal from the stop channel or timeout.
 		// This ensures that we properly handle the task's stopping behavior and confirm the channel's closure.
 		select {
-		case _, ok := <-task.stopCh:
-			// Attempt to receive a value from the `stopCh` channel.
-			// The `ok` variable will be false if the channel is closed, which is the expected behavior after `Stop()` is called.
-			assert.False(t, ok, "Expected stopCh to be closed, but it was not")
+		case <-task.stopCh:
+			// Attempt to receive from the `stopCh` channel to check if it's closed.
+			// In Go, receiving from a closed channel returns the zero value immediately and `ok` is false.
+			// If the channel is still open, `ok` would be true, indicating that the task is still running.
+			_, ok := <-task.stopCh
+
+			// Assert that `ok` is false, meaning that the `stopCh` should be closed at this point.
+			// A closed `stopCh` indicates that the task has completed its execution and signaled completion.
+			// If the channel is still open (`ok` is true), this would imply the task has not finished properly, and the test should fail.
+			assert.False(t, ok, "Expected stop channel to be closed, indicating job completion")
 
 			// Introduce a short delay to ensure that asynchronous operations have time to complete.
 			// This delay allows the stop signal to propagate and any remaining processing to finalize.
