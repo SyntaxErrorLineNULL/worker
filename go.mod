@@ -1,4 +1,4 @@
-module worker
+module github.com/SyntaxErrorLineNULL/worker
 
 go 1.22
 
