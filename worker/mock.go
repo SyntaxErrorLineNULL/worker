@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -109,4 +110,59 @@ func (m *MockProcessingWithPanic) ErrorHandler(_ context.Context, _ interface{})
 func (m *MockProcessingWithPanic) Result() chan interface{} {
 	// Return nil as no result handling is implemented in this mock.
 	return nil
+}
+
+var ErrorMockPanic = errors.New("some panic")
+
+// MockPanicTask is a mock implementation of the Task interface designed to simulate
+// a task that panics during execution. This can be used in testing scenarios where
+// you need to verify the behavior of a worker or system when a task causes a panic.
+type MockPanicTask struct{}
+
+// SetWaitGroup simulates setting a wait group for the task.
+// It immediately marks the wait group as done, as if the task has completed.
+func (t *MockPanicTask) SetWaitGroup(wg *sync.WaitGroup) error {
+	// Mark the wait group as done.
+	wg.Done()
+	return nil
+}
+
+// SetDoneChannel is a mock implementation that does nothing with the done channel.
+// It simply returns nil, indicating success in setting the channel.
+func (t *MockPanicTask) SetDoneChannel(_ chan struct{}) error {
+	// No operation needed, simply return nil.
+	return nil
+}
+
+// SetContext is a mock implementation that does nothing with the provided context.
+// It simply returns nil, indicating success in setting the context.
+func (t *MockPanicTask) SetContext(_ context.Context) error {
+	// No operation needed, simply return nil.
+	return nil
+}
+
+// GetError is a mock implementation that returns nil.
+// This simulates a task that does not encounter any error.
+func (t *MockPanicTask) GetError() error {
+	// No error, so return nil.
+	return nil
+}
+
+// String returns an empty string as a mock representation of the task.
+func (t *MockPanicTask) String() string {
+	// Return an empty string to represent the task.
+	return ""
+}
+
+// Run simulates the execution of the task and intentionally causes a panic.
+// This is used to test how the system handles a task that panics.
+func (t *MockPanicTask) Run() {
+	// Simulate a panic occurring during task execution.
+	panic(ErrorMockPanic)
+}
+
+// Stop is a mock implementation that does nothing.
+// It simulates stopping the task, though no operation is performed here.
+func (t *MockPanicTask) Stop() {
+	// No operation needed for stopping.
 }
