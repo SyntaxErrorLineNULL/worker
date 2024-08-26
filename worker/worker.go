@@ -6,7 +6,8 @@ import (
 	"log"
 	"os"
 	"sync"
-	"worker"
+
+	"github.com/SyntaxErrorLineNULL/worker"
 )
 
 // Worker represents a worker in a task processing pool.
@@ -179,6 +180,7 @@ func (w *Worker) setStatus(status worker.Status) {
 // It closes the stop channel, causing the worker to exit its processing loop and finish the current job.
 // If there is a task in processing at the time of worker termination, it will be stopped.
 func (w *Worker) Stop() <-chan struct{} {
+	w.logger.Printf("Stop")
 	defer func() {
 		// Attempt to recover from a panic and retrieve the error.
 		if rec := recover(); rec != nil {
@@ -191,13 +193,16 @@ func (w *Worker) Stop() <-chan struct{} {
 					w.setStatus(worker.StatusWorkerStopped)
 				}
 
+				w.logger.Printf("errCh")
 				// Send the error to the worker's error channel for external handling.
 				w.errCh <- &worker.Error{Error: err, Instance: w}
 			}
-
-			// Close the error channel to indicate that no more errors will be sent.
-			close(w.errCh)
 		}
+
+		w.logger.Printf("close errCh")
+		// Close the error channel to indicate that no more errors will be sent.
+		close(w.errCh)
+		w.logger.Printf("close errCh success")
 	}()
 
 	// Create a channel to signal when the worker has stopped.
