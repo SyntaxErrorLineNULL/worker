@@ -361,4 +361,84 @@ func TestWorker(t *testing.T) {
 			t.Error("Failed to stop worker within expected time")
 		}
 	})
+
+	// WorkerPanic test case ensures that a Worker instance can handle and report a panic
+	// that occurs during the execution of a task. This is crucial for validating the robustness
+	// of the worker's error handling mechanism, especially in scenarios where unexpected
+	// panics might occur. The test verifies that the worker catches the panic, reports the
+	// appropriate error, and associates the error with the correct worker instance.
+	t.Run("WorkerPanic", func(t *testing.T) {
+		// Create a background context for the worker.
+		// This context will manage the worker's lifecycle and cancellation signals.
+		ctx := context.Background()
+
+		// Create a new Worker instance with ID 1, a timeout of 1 second, and a logger.
+		// This initializes the worker with specified parameters and ensures that it is properly set up.
+		worker := NewWorker(1)
+		// Assert that the worker instance is not nil.
+		// This checks that the worker was successfully created and is not a zero value.
+		assert.NotNil(t, worker, "Worker should be successfully created")
+
+		// Set the worker's context to the new background context.
+		// This tests the SetContext method by providing a valid context.
+		err := worker.SetContext(ctx)
+		// Assert that no error occurred when setting the context.
+		// This ensures that the SetContext method works as expected when a valid context is provided.
+		assert.NoError(t, err, "Expected no error when setting a valid context")
+
+		// Create a channel with a buffer size of 1 to receive tasks.
+		// This channel will be used as the job queue for the worker.
+		taskQueue := make(chan wr.Task, 1)
+
+		// Set the worker's queue to the open channel.
+		// This tests that the worker can successfully use the open channel as its job queue.
+		err = worker.SetQueue(taskQueue)
+		// Assert that no error is returned when setting an open channel.
+		// This confirms that setting an open channel is handled correctly by the worker.
+		assert.NoError(t, err, "Setting an open channel should not produce an error")
+
+		// Create an instance of MockPanicTask, which simulates a task that will panic during its execution.
+		// This mock task is used to test the worker's panic handling capabilities.
+		mockPanicTask := &MockPanicTask{}
+
+		// Send the mock panic task to the worker's task queue.
+		// This simulates the worker receiving a task that will cause a panic when executed.
+		taskQueue <- mockPanicTask
+
+		// Increment the WaitGroup counter by 1 to account for the worker's goroutine.
+		// This is necessary to properly synchronize the test's main goroutine with the worker's goroutine.
+		wg.Add(1)
+
+		// Start a new goroutine to handle the delayed start of the worker.
+		// This goroutine allows the worker to begin processing tasks independently of the main test execution.
+		go func() {
+			// Introduce a delay of 1 second before starting the worker.
+			// This delay simulates a real-world scenario where the worker might not start immediately after initialization.
+			<-time.After(1 * time.Second)
+
+			// Begin the worker's task processing.
+			// The worker will start processing tasks from its queue and handle any errors or panics that occur.
+			// The `wg` (WaitGroup) is passed to ensure that the test waits for the worker to finish before proceeding.
+			worker.Start(wg)
+		}()
+
+		select {
+		// Wait for the worker to handle the task and check for errors or a timeout.
+		// This select block listens for the worker to signal that it encountered an error or waits for a timeout.
+		case workerError := <-worker.GetError():
+			// Assert that the error received is the expected panic error.
+			// This verifies that the worker correctly identified and reported the panic error.
+			assert.ErrorIs(t, workerError.Error, ErrorMockPanic)
+			// Assert that the error instance matches the worker that encountered the error.
+			// This confirms that the correct worker is associated with the reported error.
+			assert.Equal(t, worker, workerError.Instance)
+
+		case <-time.After(5 * time.Second):
+			// If the worker does not stop within the allocated 5 seconds, this block will execute.
+			// This indicates that the worker took too long to stop, which could signify a problem with the shutdown process.
+			// The test will fail, providing feedback that the worker did not stop as expected within the given time frame.
+			t.Error("Failed to stop worker within expected time")
+		}
+
+	})
 }
