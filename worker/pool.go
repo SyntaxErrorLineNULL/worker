@@ -7,7 +7,8 @@ import (
 	"runtime"
 	"sync"
 	"sync/atomic"
-	"worker"
+
+	"github.com/SyntaxErrorLineNULL/worker"
 )
 
 type Pool struct {
