@@ -208,10 +208,6 @@ func TestWorker(t *testing.T) {
 		case <-time.After(2 * time.Second):
 			t.Error("Worker did not stop within the expected time.")
 		}
-
-		// Explicitly wait for the WaitGroup to ensure that all goroutines have finished executing.
-		// This ensures proper cleanup and prevents test flakiness due to unfinished goroutines.
-		wg.Wait()
 	})
 
 	// ContextDone tests the worker's behavior when its context is canceled. The test verifies that the worker
