@@ -84,6 +84,36 @@ func (w *Worker) SetQueue(queue chan worker.Task) error {
 	return nil
 }
 
+func (w *Worker) Start(wg *sync.WaitGroup) {
+	// As soon as a worker is created, it is necessarily in the status of StatusWorkerIdle.
+	// This indicates that the worker is ready but currently not processing any jobs.
+	w.setStatus(worker.StatusWorkerIdle)
+
+	// This deferred function serves as a recovery and cleanup mechanism for the worker.
+	// If a panic occurs during the execution of a worker's main cycle,
+	// in order not to lose a worker, the error channel will receive information with the error and the instance of the worker to be recovered.
+	defer func() {
+		// Attempt to recover from a panic and retrieve the error.
+		if rec := recover(); rec != nil {
+			// Convert the recovered value to an error.
+			err := worker.GetRecoverError(rec)
+			if err != nil {
+				// Send the error to the worker's error channel for external handling.
+				w.errCh <- &worker.Error{Error: err, Instance: w}
+			}
+		}
+
+		// Set the worker status to "stopped" before signaling the completion of the task.
+		w.setStatus(worker.StatusWorkerStopped)
+
+		// If a wait group is provided, decrement its counter to signal that the worker has completed its task.
+		if wg != nil {
+			// Decrement the WaitGroup counter to signal that the worker has completed its task.
+			wg.Done()
+		}
+	}()
+}
+
 // setStatus is responsible for safely updating the status of a Worker instance in a concurrent environment.
 // It uses a mutex to ensure that only one goroutine can modify the worker's status at a time, preventing
 // race conditions that could lead to inconsistent state or unexpected behavior. The method locks the worker's
