@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"context"
 	"testing"
 	wr "worker"
 
@@ -76,5 +77,43 @@ func TestWorker(t *testing.T) {
 		// Assert that an error is returned when setting a closed channel.
 		// This verifies that the worker's SetQueue method correctly handles and reports an error for closed channels.
 		assert.Error(t, err, "Setting a closed channel should produce an error")
+	})
+
+	// SetContext tests the SetContext method of the Worker type.
+	// It verifies that the worker's context is correctly set and that setting a nil context
+	// does not change the existing context. This test ensures proper behavior when managing
+	// the worker's context during its lifecycle.
+	t.Run("SetContext", func(t *testing.T) {
+		// Create a new Worker instance with ID 1, a timeout of 1 second, and a logger.
+		// This initializes the worker with specified parameters and ensures that it is properly set up.
+		worker := NewWorker(1)
+		// Assert that the worker instance is not nil.
+		// This checks that the worker was successfully created and is not a zero value.
+		assert.NotNil(t, worker, "Worker should be successfully created")
+
+		// Create a new background context for testing.
+		// This context will be used to set and verify the worker's context.
+		ctx := context.Background()
+
+		// Set the worker's context to the new background context.
+		// This tests the SetContext method by providing a valid context.
+		err := worker.SetContext(ctx)
+		// Assert that no error occurred when setting the context.
+		// This ensures that the SetContext method works as expected when a valid context is provided.
+		assert.NoError(t, err, "Expected no error when setting a valid context")
+		// Assert that the worker's context is set correctly.
+		// This checks that the worker's context matches the provided context after setting it.
+		assert.Equal(t, ctx, worker.workerContext, "Worker context should be set to the provided context")
+
+		// Attempt to set the worker's context to nil.
+		// This tests the SetContext method's handling of invalid input.
+		err = worker.SetContext(nil)
+		// Assert that an error occurred when trying to set a nil context.
+		// This verifies that the method correctly returns an error for invalid input.
+		assert.Error(t, err, "Expected an error when setting a nil context")
+
+		// Assert that the worker's context remains unchanged after attempting to set a nil context.
+		// This verifies that the context does not get altered if a nil value is provided.
+		assert.Equal(t, ctx, worker.workerContext, "Worker context should remain unchanged when setting a nil context")
 	})
 }
