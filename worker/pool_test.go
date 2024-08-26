@@ -3,8 +3,8 @@ package worker
 import (
 	"context"
 	"testing"
-	"worker"
 
+	"github.com/SyntaxErrorLineNULL/worker"
 	"github.com/stretchr/testify/assert"
 )
 
