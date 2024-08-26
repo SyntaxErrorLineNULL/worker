@@ -48,7 +48,7 @@ func (w *Worker) SetContext(ctx context.Context) error {
 	// should not be used. Return an error in this case to prevent setting
 	// an invalid context for the worker.
 	if ctx == nil {
-		return errors.New("context cannot be nil")
+		return worker.ContextIsNil
 	}
 
 	// Assign the provided context to the worker's context field.
@@ -85,6 +85,11 @@ func (w *Worker) SetQueue(queue chan worker.Task) error {
 }
 
 func (w *Worker) Start(wg *sync.WaitGroup) {
+	if wg == nil {
+		w.errCh <- &worker.Error{Error: worker.WaitGroupIsNil, Instance: w}
+		return
+	}
+
 	// As soon as a worker is created, it is necessarily in the status of StatusWorkerIdle.
 	// This indicates that the worker is ready but currently not processing any jobs.
 	w.setStatus(worker.StatusWorkerIdle)
@@ -112,6 +117,44 @@ func (w *Worker) Start(wg *sync.WaitGroup) {
 			wg.Done()
 		}
 	}()
+
+	for {
+		select {
+		case _, ok := <-w.stopCh:
+			// Check if the stop channel is closed unexpectedly.
+			if !ok {
+				w.logger.Printf("stop channel is close, workerID: %d", w.workerID)
+				return
+			}
+
+			w.logger.Printf("stop channel workerID: %d", w.workerID)
+			return
+
+		case <-w.workerContext.Done():
+			w.logger.Printf("parent context is close")
+			return
+
+		case task, ok := <-w.queue:
+			if ok {
+				w.setStatus(worker.StatusWorkerRunning)
+				w.currentProcess = task
+
+				wg.Add(1)
+
+				_ = task.SetWaitGroup(wg)
+
+				go task.Run()
+
+				w.currentProcess = nil
+				w.setStatus(worker.StatusWorkerIdle)
+			} else {
+				// if the job channel is closed, there is no point in further work of the worker
+				w.setStatus(worker.StatusWorkerStopped)
+				w.logger.Printf("job collector is close: workerID: %d, workerStatus: %d", w.workerContext, w.status)
+				return
+			}
+		}
+	}
 }
 
 // setStatus is responsible for safely updating the status of a Worker instance in a concurrent environment.
@@ -130,6 +173,68 @@ func (w *Worker) setStatus(status worker.Status) {
 	// Set the worker's status to the provided status value.
 	// This updates the worker's status field with the new status.
 	w.status = status
+}
+
+// Stop signals the worker to stop processing tasks and returns a channel to indicate completion.
+// It closes the stop channel, causing the worker to exit its processing loop and finish the current job.
+// If there is a task in processing at the time of worker termination, it will be stopped.
+func (w *Worker) Stop() <-chan struct{} {
+	defer func() {
+		// Attempt to recover from a panic and retrieve the error.
+		if rec := recover(); rec != nil {
+			// Convert the recovered value to an error.
+			err := worker.GetRecoverError(rec)
+			if err != nil {
+				// This is in case something caused a panic, but the worker status was not set to worker.StatusWorkerStopped,
+				// so that the Worker pool would not recover the worker.
+				if w.GetStatus() != worker.StatusWorkerStopped {
+					w.setStatus(worker.StatusWorkerStopped)
+				}
+
+				// Send the error to the worker's error channel for external handling.
+				w.errCh <- &worker.Error{Error: err, Instance: w}
+			}
+
+			// Close the error channel to indicate that no more errors will be sent.
+			close(w.errCh)
+		}
+	}()
+
+	// Create a channel to signal when the worker has stopped.
+	// The buffered channel allows sending a single signal indicating the stop process is complete.
+	doneCh := make(chan struct{}, 1)
+
+	// Ensure the stop process is only executed once using sync.Once.
+	w.onceStop.Do(func() {
+		// Acquire a read lock on the worker to prevent concurrent shutdown operations.
+		w.mutex.RLock()
+		// Release the read lock after the shutdown sequence is complete.
+		defer w.mutex.RUnlock()
+
+		// Set the worker's status to "stopped" to indicate that it is no longer active.
+		w.setStatus(worker.StatusWorkerStopped)
+
+		// If there is a task currently being processed, stop it.
+		// This ensures that any ongoing work is properly terminated.
+		if w.currentProcess != nil {
+			w.currentProcess.Stop()
+		}
+
+		// Send a signal through the done channel to indicate that the worker has stopped.
+		doneCh <- struct{}{}
+		// Close the done channel to indicate that no more signals will be sent.
+		close(doneCh)
+
+		// Send a signal through the stop channel to indicate the worker should stop processing.
+		w.stopCh <- struct{}{}
+		// Close the stop channel to indicate that no more stop signals will be sent.
+		close(w.stopCh)
+
+		return
+	})
+
+	// Return the channel to allow external monitoring of completion.
+	return doneCh
 }
 
 // GetStatus is a method that retrieves the current status of a Worker instance.
