@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
-	"worker"
+
+	"github.com/SyntaxErrorLineNULL/worker"
 )
 
 // Task is a struct that encapsulates the execution logic of a concurrent task.
