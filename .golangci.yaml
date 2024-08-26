@@ -1,0 +1,92 @@
+linters:
+  # Set to true runs only fast linters.
+  # Good option for 'lint on save', pre-commit hook or CI.
+  fast: false
+  disable-all: true
+  enable:
+    - revive
+    - megacheck
+    # Vet examines Go source code and reports suspicious constructs,
+    # such as Printf calls whose arguments do not align with the format string.
+    - govet
+    - unconvert
+    - gas
+    # Computes and checks the cyclomatic complexity of functions.
+    - gocyclo
+    - dupl
+    - misspell
+    - unparam
+    - unused
+    - typecheck
+    - ineffassign
+    # Checks for pointers to enclosing loop variables.
+    - exportloopref
+    # Provides diagnostics that check for bugs, performance and style issues.
+    - gocritic
+    - nakedret
+    # Linter for Go source code that specializes in simplifying code.
+    - gosimple
+    # Finds slice declarations that could potentially be pre-allocated.
+    - prealloc
+
+# golangci-lint configuration file
+linters-settings:
+  revive:
+    ignore-generated-header: true
+    severity: warning
+    rules:
+      - name: package-comments
+        severity: warning
+        disabled: true
+      - name: exported
+        severity: warning
+        disabled: false
+        arguments: ["checkPrivateReceivers", "disableStutteringCheck"]
+
+  errcheck:
+    # Report `a := b.(MyStruct)` when `a, ok := ...` should be.
+    check-type-assertions: true # Default: false
+
+    ## Report skipped checks:`num, _ := strconv.Atoi(numStr)`.
+    #check-blank: true # Default: false
+
+    # Function to skip.
+    #exclude-functions:
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      # These 3 will detect many cases, but they do sense
+      # if it's performance oriented code
+      - hugeParam
+      - rangeExprCopy
+      - rangeValCopy
+
+  goimports:
+    local-prefixes: github.com/SyntaxErrorLineNULL/gocache
+
+issues:
+  # Setting 0 to have all the results.
+  max-issues-per-linter: 0
+
+  # Same here, nothing should be skipped to not miss errors.
+  max-same-issues: 0
+
+  # When set to `true` linter will analyze only new code which are
+  # not committed or after some specific revision. This is a cool
+  # feature when you're going to introduce linter into a big project.
+  # So, it's set to `false` to scan all code.
+  new: false
+
+  # Never fix anything, just report.
+  fix: false
+  exclude-use-default: false
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - dupl
