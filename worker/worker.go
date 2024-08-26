@@ -43,14 +43,19 @@ func NewWorker(workerID int64) *Worker {
 // a new context for the worker, which can be used to control its operations
 // and manage its lifecycle. The method ensures that the provided context is not
 // nil before setting it, maintaining the integrity of the worker's context.
-func (w *Worker) SetContext(ctx context.Context) {
-	// Check if the provided context is not nil.
-	// This ensures that we only set a valid context for the worker.
-	if ctx != nil {
-		// Set the worker's context to the provided context.
-		// This allows the worker to use the new context for its operations.
-		w.workerContext = ctx
+func (w *Worker) SetContext(ctx context.Context) error {
+	// Check if the provided context is nil. A nil context is invalid and
+	// should not be used. Return an error in this case to prevent setting
+	// an invalid context for the worker.
+	if ctx == nil {
+		return errors.New("context cannot be nil")
 	}
+
+	// Assign the provided context to the worker's context field.
+	// This allows the worker to use this context for its operations.
+	w.workerContext = ctx
+
+	return nil
 }
 
 // SetQueue sets the task queue channel for the worker. This method allows
