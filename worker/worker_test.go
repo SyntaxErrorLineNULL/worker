@@ -289,4 +289,76 @@ func TestWorker(t *testing.T) {
 			t.Error("Failed to stop worker within expected time")
 		}
 	})
+
+	// SuccessStop tests the `Stop` method of the Worker struct to ensure that the worker
+	// transitions to the 'stopped' state properly. It verifies that the worker's status
+	// is updated to 'stopped', and that both the error channel and stop channel are closed
+	// as expected when the worker has finished stopping.
+	t.Run("SuccessStop", func(t *testing.T) {
+		// Create a background context for the worker.
+		// This context will manage the worker's lifecycle and cancellation signals.
+		ctx := context.Background()
+
+		// Create a new Worker instance with ID 1, a timeout of 1 second, and a logger.
+		// This initializes the worker with specified parameters and ensures that it is properly set up.
+		worker := NewWorker(1)
+		// Assert that the worker instance is not nil.
+		// This checks that the worker was successfully created and is not a zero value.
+		assert.NotNil(t, worker, "Worker should be successfully created")
+
+		// Set the worker's context to the new background context.
+		// This tests the SetContext method by providing a valid context.
+		err := worker.SetContext(ctx)
+		// Assert that no error occurred when setting the context.
+		// This ensures that the SetContext method works as expected when a valid context is provided.
+		assert.NoError(t, err, "Expected no error when setting a valid context")
+
+		// Create a channel with a buffer size of 1 to receive tasks.
+		// This channel will be used as the job queue for the worker.
+		taskQueue := make(chan wr.Task, 1)
+
+		// Set the worker's queue to the open channel.
+		// This tests that the worker can successfully use the open channel as its job queue.
+		err = worker.SetQueue(taskQueue)
+		// Assert that no error is returned when setting an open channel.
+		// This confirms that setting an open channel is handled correctly by the worker.
+		assert.NoError(t, err, "Setting an open channel should not produce an error")
+
+		select {
+		// Wait for the worker to signal that it has stopped.
+		// The `select` statement is used to wait for signals from the worker's stop channel,
+		// ensuring that we handle the stop notification correctly and verify the worker's status.
+		case <-worker.Stop():
+			// Assert that the worker status is 'stopped' after cancellation.
+			// This verifies that the worker correctly transitions to the 'stopped' state.
+			assert.Equal(t, wr.StatusWorkerStopped, worker.GetStatus(), "Expected worker status to be stopped")
+
+			// Check if the error channel is closed after the worker stops.
+			// Receiving from the worker's error channel to see if it is closed.
+			// If the error channel is closed, the worker has finished processing and has cleaned up resources.
+			_, ok := <-worker.GetError()
+			// Assert that the channel is closed (`ok` is false), indicating that no further errors are being sent.
+			// A closed error channel suggests that the worker has properly finished its execution without outstanding errors.
+			assert.False(t, ok, "Error channel should be closed after worker stops")
+
+			select {
+			// Wait for the worker's stop channel to confirm it is closed.
+			// The stop channel should be closed as part of the worker's shutdown process.
+			// We use this to ensure that the worker has completed all shutdown activities and no further signals will be sent.
+			case <-worker.stopCh:
+				// Attempt to read from the stop channel to verify that it's closed.
+				// Since the channel should be closed, the read operation should succeed and return the zero value of the channel's type.
+				_, ok = <-worker.stopCh
+				// Assert that the stop channel is indeed closed.
+				// If the channel is closed, `ok` should be false, confirming that the worker has fully stopped and cleaned up.
+				assert.False(t, ok, "Stop channel should be closed after worker stops")
+			}
+
+		case <-time.After(2 * time.Second):
+			// If the worker does not stop within the allocated 2 seconds, this block will execute.
+			// This indicates that the worker took too long to stop, which could signify a problem with the shutdown process.
+			// The test will fail, providing feedback that the worker did not stop as expected within the given time frame.
+			t.Error("Failed to stop worker within expected time")
+		}
+	})
 }
