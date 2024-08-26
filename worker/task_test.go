@@ -6,8 +6,8 @@ import (
 	"sync"
 	"testing"
 	"time"
-	"worker/mocks"
 
+	"github.com/SyntaxErrorLineNULL/worker/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
