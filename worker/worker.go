@@ -85,9 +85,27 @@ func (w *Worker) SetQueue(queue chan worker.Task) error {
 	return nil
 }
 
+// Start begins the worker's execution cycle. It initializes the worker's status,
+// manages tasks from the job queue, and handles errors and context cancellations.
+// The method uses a WaitGroup to signal when the worker has finished its work and includes
+// mechanisms for recovery from panics to ensure that the worker continues operating smoothly
+// even if unexpected errors occur.
 func (w *Worker) Start(wg *sync.WaitGroup) {
+	// Check if the provided WaitGroup is nil.
+	// If nil, send an error to the worker's error channel and return.
 	if wg == nil {
+		// If a wait group is provided, decrement its counter to signal that the worker has completed its task.
+		if wg != nil {
+			// Decrement the WaitGroup counter to signal that the worker has completed its task.
+			wg.Done()
+		}
+
+		// If the WaitGroup is nil, send an error to the worker's error channel.
+		// This error indicates that the WaitGroup was not properly initialized and is required for worker synchronization.
 		w.errCh <- &worker.Error{Error: worker.WaitGroupIsNil, Instance: w}
+
+		// Immediately return from the function since a nil WaitGroup is a critical issue.
+		// The worker cannot start properly without a valid WaitGroup to manage its task completion.
 		return
 	}
 
@@ -109,9 +127,6 @@ func (w *Worker) Start(wg *sync.WaitGroup) {
 			}
 		}
 
-		// Set the worker status to "stopped" before signaling the completion of the task.
-		w.setStatus(worker.StatusWorkerStopped)
-
 		// If a wait group is provided, decrement its counter to signal that the worker has completed its task.
 		if wg != nil {
 			// Decrement the WaitGroup counter to signal that the worker has completed its task.
@@ -119,39 +134,78 @@ func (w *Worker) Start(wg *sync.WaitGroup) {
 		}
 	}()
 
+	// Infinite loop that allows the worker to continuously check for and process tasks.
 	for {
+		// The select statement waits for one of its cases to be ready to execute.
 		select {
-		case _, ok := <-w.stopCh:
-			// Check if the stop channel is closed unexpectedly.
-			if !ok {
-				w.logger.Printf("stop channel is close, workerID: %d", w.workerID)
-				return
-			}
-
+		// This case handles the situation where the worker receives a signal from its stop channel.
+		// The stop channel stopCh is used to signal that the worker should stop its execution.
+		case <-w.stopCh:
 			w.logger.Printf("stop channel workerID: %d", w.workerID)
+			// Exit the loop, effectively stopping the worker's execution.
+			// This happens when the stop channel is triggered, signaling that the worker should terminate.
 			return
 
+		// This case handles the situation where the worker's parent context is done.
+		// The worker listens to the `workerContext` channel for a done signal,
+		// which indicates that the context in which the worker operates has been cancelled or expired.
 		case <-w.workerContext.Done():
 			w.logger.Printf("parent context is close")
+			// Set the worker status to stopped.
+			// This action updates the worker's status to reflect that it is stopping due to the parent context being done.
+			// This helps in maintaining accurate status information and allows other components
+			// to be aware that the worker is no longer active.
+			w.Stop()
+
+			// Exit the loop, effectively stopping the worker's execution.
+			// The `return` statement breaks out of the infinite loop and stops further processing.
+			// This ensures that the worker ceases its operations when the parent context is cancelled,
+			// allowing it to exit gracefully and freeing up resources.
 			return
 
+		// This case handles incoming tasks from the worker's task queue.
+		// The <-w.queue operation attempts to receive a task from the channel.
+		// The ok variable indicates whether the channel is still open true or has been closed false.
 		case task, ok := <-w.queue:
+			// If the channel is open and a task is received successfully:
 			if ok {
+				// Update the worker's status to indicate that it is currently running a task.
+				// The `StatusWorkerRunning` status reflects that the worker is actively processing a job.
 				w.setStatus(worker.StatusWorkerRunning)
+
+				// Assign the received task to the worker's `currentProcess` field.
+				// This keeps track of the task currently being executed by the worker.
 				w.currentProcess = task
 
+				// Increment the WaitGroup counter to account for the new task being processed.
+				// This helps synchronize the completion of the task with other concurrent operations.
 				wg.Add(1)
 
+				// Set the WaitGroup for the task. This allows the task to signal when it has completed.
+				// The `task.SetWaitGroup(wg)` call ensures that the task can signal its completion.
 				_ = task.SetWaitGroup(wg)
 
-				go task.Run()
+				// Execute the task's `Run` method.
+				// This method contains the logic to process the task.
+				task.Run()
 
+				// After the task completes, reset the worker's `currentProcess` to `nil`.
+				// This clears the reference to the completed task.
 				w.currentProcess = nil
+
+				// Update the worker's status to indicate that it is idle and ready for the next task.
+				// The `StatusWorkerIdle` status reflects that the worker has finished the current task
+				// and is available for new work.
 				w.setStatus(worker.StatusWorkerIdle)
 			} else {
-				// if the job channel is closed, there is no point in further work of the worker
-				w.setStatus(worker.StatusWorkerStopped)
+				// If the task queue channel is closed
 				w.logger.Printf("job collector is close: workerID: %d, workerStatus: %d", w.workerContext, w.status)
+				// Call the worker's `Stop` method to clean up and stop the worker.
+				// This method sets the worker status to stopped and performs necessary cleanup.
+				w.Stop()
+
+				// Exit the loop and terminate the worker's execution.
+				// This `return` statement breaks out of the loop, effectively stopping the worker.
 				return
 			}
 		}
@@ -180,7 +234,6 @@ func (w *Worker) setStatus(status worker.Status) {
 // It closes the stop channel, causing the worker to exit its processing loop and finish the current job.
 // If there is a task in processing at the time of worker termination, it will be stopped.
 func (w *Worker) Stop() <-chan struct{} {
-	w.logger.Printf("Stop")
 	defer func() {
 		// Attempt to recover from a panic and retrieve the error.
 		if rec := recover(); rec != nil {
@@ -193,16 +246,13 @@ func (w *Worker) Stop() <-chan struct{} {
 					w.setStatus(worker.StatusWorkerStopped)
 				}
 
-				w.logger.Printf("errCh")
 				// Send the error to the worker's error channel for external handling.
 				w.errCh <- &worker.Error{Error: err, Instance: w}
 			}
 		}
 
-		w.logger.Printf("close errCh")
 		// Close the error channel to indicate that no more errors will be sent.
 		close(w.errCh)
-		w.logger.Printf("close errCh success")
 	}()
 
 	// Create a channel to signal when the worker has stopped.
