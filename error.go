@@ -3,19 +3,30 @@ package worker
 import "errors"
 
 var (
-	// WaitGroupIsNil is an error indicating that a nil wait group was provided.
+	// WaitGroupIsNilError is an error indicating that a nil wait group was provided.
 	// This error is used to signal that an operation requiring a non-nil wait group
 	// encountered an invalid input, preventing proper synchronization.
-	WaitGroupIsNil = errors.New("wait group is nil")
+	WaitGroupIsNilError = errors.New("wait group is nil")
 
-	// ContextIsNil is an error indicating that a nil context was provided.
+	// ContextIsNilError is an error indicating that a nil context was provided.
 	// This error is used to signal that an operation requiring a non-nil context
 	// encountered an invalid input, which could disrupt the operation's control flow.
-	ContextIsNil = errors.New("context is nil")
+	ContextIsNilError = errors.New("context is nil")
 
-	ChanIsClose = errors.New("chan is close")
+	// ChanIsCloseError is an error indicating that a channel has been closed.
+	// This error is typically used when an operation attempts to send or receive
+	// on a closed channel, which is an illegal operation in Go.
+	ChanIsCloseError = errors.New("chan is close")
 
-	ChanIsEmpty = errors.New("chan is empty")
+	// ChanIsEmptyError is an error indicating that a channel is empty.
+	// This error might be used when an operation expected a channel to have available data,
+	// but found it empty, preventing the operation from proceeding as intended.
+	ChanIsEmptyError = errors.New("chan is empty")
+
+	// MaxWorkersReachedError is an error indicating that the maximum number of workers has been reached.
+	// This error is used to prevent the creation of additional workers beyond the allowed limit,
+	// ensuring that the system's resources are managed efficiently and within expected constraints.
+	MaxWorkersReachedError = errors.New("maximum number of workers reached")
 )
 
 // Error encapsulates an error along with the reference to the Worker instance
