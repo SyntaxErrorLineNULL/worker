@@ -163,6 +163,8 @@ func (p *Pool) AddWorker(wr worker.Worker) (err error) {
 	return nil
 }
 
+func (p *Pool) loop() {}
+
 // RunningWorkers returns the current number of running workers in the pool.
 // It retrieves the count of active workers using atomic operations to ensure thread safety.
 func (p *Pool) RunningWorkers() int32 {
