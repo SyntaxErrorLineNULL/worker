@@ -69,7 +69,36 @@ func (p *Pool) Run() {
 	})
 }
 
-func (p *Pool) loop() {}
+func (p *Pool) loop() {
+	defer func() {
+		// Recover from any panic in the job and report it.
+		if rec := recover(); rec != nil {
+			err := worker.GetRecoverError(rec)
+			if err != nil {
+				return
+			}
+		}
+
+		p.workerWg.Done()
+		p.contextCancelFunc()
+	}()
+
+	for {
+		select {
+		case <-p.stopCh:
+			p.logger.Println("stop pool")
+			return
+		case <-p.ctx.Done():
+			if !p.stopped {
+				p.logger.Println("stop pool")
+				// TODO: call Stop()
+			}
+
+			// Exit the loop.
+			return
+		}
+	}
+}
 
 // AddTaskInQueue attempts to add a task to the pool's task queue for processing.
 // It performs several safety checks, including recovering from potential panics
