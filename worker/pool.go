@@ -55,6 +55,22 @@ func NewWorkerPool(options *worker.Options) *Pool {
 	}
 }
 
+// Run starts the worker pool and worker goroutines. It creates and launches a specified number of worker goroutines,
+// each of which is responsible for processing jobs from a shared collector. This method also continuously listens for stop signals
+// or context cancellation and reacts accordingly, ensuring a clean and controlled shutdown of the worker pool.
+// For safety once is used, this is done in case someone will use worker pool in more than one place,
+// and it will happen that Start will be started again, nothing critical will happen and we will not lose the past handlers.
+func (p *Pool) Run() {
+	p.onceStart.Do(func() {
+		// Add one to the wait group for the main pool loop.
+		p.workerWg.Add(1)
+		// Start the main pool loop in a goroutine.
+		go p.loop()
+	})
+}
+
+func (p *Pool) loop() {}
+
 // AddTaskInQueue attempts to add a task to the pool's task queue for processing.
 // It performs several safety checks, including recovering from potential panics
 // and ensuring the queue is valid before adding the task. If the queue is not
@@ -162,8 +178,6 @@ func (p *Pool) AddWorker(wr worker.Worker) (err error) {
 	// Return nil to indicate that the worker was successfully added and started.
 	return nil
 }
-
-func (p *Pool) loop() {}
 
 // RunningWorkers returns the current number of running workers in the pool.
 // It retrieves the count of active workers using atomic operations to ensure thread safety.
