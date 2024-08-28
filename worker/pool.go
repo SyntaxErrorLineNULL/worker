@@ -264,3 +264,13 @@ func (p *Pool) decrementWorkerCount() {
 	// atomic.AddInt32(&p.workerConcurrency, -1)
 	p.workerConcurrency.Add(-1)
 }
+
+func (p *Pool) Stop() {
+	defer func() {
+		if r := recover(); r != nil {
+			p.logger.Println("stop pool panic")
+			return
+		}
+	}()
+
+}
