@@ -12,6 +12,10 @@ var (
 	// This error is used to signal that an operation requiring a non-nil context
 	// encountered an invalid input, which could disrupt the operation's control flow.
 	ContextIsNil = errors.New("context is nil")
+
+	ChanIsClose = errors.New("chan is close")
+
+	ChanIsEmpty = errors.New("chan is empty")
 )
 
 // Error encapsulates an error along with the reference to the Worker instance
