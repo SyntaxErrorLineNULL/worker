@@ -18,8 +18,7 @@ type Pool struct {
 	workers           []worker.Worker    // Slice to hold worker instances.
 	maxWorkersCount   int32              // Maximum number of workers in the pool.
 	workerConcurrency atomic.Int32       // Number of currently running workers.
-	poolWg            sync.WaitGroup     // Wait group for tracking running workers
-	workerWg          sync.WaitGroup
+	workerWg          *sync.WaitGroup
 	stopCh            chan struct{}      // Channel to signal stopping the pool.
 	mutex             sync.Mutex         // Mutex for locking access to the pool.
 	onceStart         sync.Once          // Used for a one-time action (starting the pool).
@@ -51,6 +50,7 @@ func NewWorkerPool(options *worker.Options) *Pool {
 		stopCh:            make(chan struct{}, 1),
 		stopped:           false,
 		workerErrorCh:     make(chan *worker.Error),
+		workerWg:          new(sync.WaitGroup),
 		logger:            logger,
 	}
 }
@@ -77,7 +77,7 @@ func (p *Pool) AddTaskInQueue(task worker.Task) (err error) {
 	// Check if the taskQueue is nil, indicating that the queue has not been initialized.
 	// If the taskQueue is nil, return an error indicating that the channel is empty.
 	if p.taskQueue == nil {
-		return worker.ChanIsEmpty
+		return worker.ChanIsEmptyError
 	}
 
 	// Use a select statement to check the state of the taskQueue channel.
@@ -86,7 +86,7 @@ func (p *Pool) AddTaskInQueue(task worker.Task) (err error) {
 	case <-p.taskQueue:
 		// If the channel is closed, return an error indicating that the channel is closed.
 		// This prevents adding tasks to a closed channel, which would cause a panic.
-		return worker.ChanIsClose
+		return worker.ChanIsCloseError
 	default:
 		// If the channel is not closed, continue execution without blocking.
 		// The default case allows the program to move on to adding the task to the queue.
@@ -97,6 +97,69 @@ func (p *Pool) AddTaskInQueue(task worker.Task) (err error) {
 	p.taskQueue <- task
 
 	// Return nil to indicate that the task was successfully added to the queue.
+	return nil
+}
+
+// AddWorker adds a new worker to the worker pool and starts its execution.
+// It ensures that the worker is correctly initialized with the pool's context
+// and task queue, and handles any errors or panics that occur during the process.
+func (p *Pool) AddWorker(wr worker.Worker) (err error) {
+	// Use a defer statement to recover from any panic that occurs during the
+	// addition of the worker and convert it into an error.
+	defer func() {
+		if rec := recover(); rec != nil {
+			// Convert the recovered panic value into an error.
+			// This ensures that any panic during task addition is properly handled.
+			err = worker.GetRecoverError(rec)
+			// If an error is successfully created from the panic, return immediately.
+			// This prevents further execution in case of a critical failure.
+			if err != nil {
+				return
+			}
+		}
+	}()
+
+	// Attempt to increment the worker count. This checks if adding another worker
+	// would exceed the maximum allowed workers in the pool.
+	// If the worker count cannot be incremented (e.g., because the limit has been reached),
+	// return an error indicating that the maximum number of workers has been reached.
+	if !p.incrementWorkerCount() {
+		return worker.MaxWorkersReachedError
+	}
+
+	// Lock the pool's mutex to ensure thread safety when modifying the pool's state.
+	// This is necessary because multiple goroutines could attempt to add workers simultaneously.
+	p.mutex.Lock()
+	// Ensure the mutex is unlocked when the function returns to avoid deadlocks.
+	defer p.mutex.Unlock()
+
+	// Set the context for the worker. This context is used to control the worker's
+	// execution, including cancellation and timeouts. If setting the context fails,
+	// return the encountered error.
+	if err = wr.SetContext(p.ctx); err != nil {
+		return err
+	}
+
+	// Assign the task queue to the worker. The worker will pull tasks from this queue
+	// for processing. If setting the queue fails, return the encountered error.
+	if err = wr.SetQueue(p.taskQueue); err != nil {
+		return err
+	}
+
+	// Append the worker to the pool's slice of workers.
+	// This adds the worker to the internal tracking structure of the pool.
+	p.workers = append(p.workers, wr)
+
+	// Increment the WaitGroup counter to track this worker's lifecycle.
+	// This ensures that the pool can wait for all workers to complete before shutting down.
+	p.workerWg.Add(1)
+
+	// Start the worker in a new goroutine.
+	// The worker will begin processing tasks from the queue immediately.
+	// The worker's lifecycle is tracked using the WaitGroup.
+	go wr.Start(p.workerWg)
+
+	// Return nil to indicate that the worker was successfully added and started.
 	return nil
 }
 
