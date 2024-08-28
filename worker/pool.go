@@ -55,6 +55,51 @@ func NewWorkerPool(options *worker.Options) *Pool {
 	}
 }
 
+// AddTaskInQueue attempts to add a task to the pool's task queue for processing.
+// It performs several safety checks, including recovering from potential panics
+// and ensuring the queue is valid before adding the task. If the queue is not
+// initialized or has been closed, appropriate errors are returned.
+func (p *Pool) AddTaskInQueue(task worker.Task) (err error) {
+	// Use a defer statement to recover from panics and log any errors
+	defer func() {
+		if rec := recover(); rec != nil {
+			// Convert the recovered panic value into an error.
+			// This ensures that any panic during task addition is properly handled.
+			err = worker.GetRecoverError(rec)
+			// If an error is successfully created from the panic, return immediately.
+			// This prevents further execution in case of a critical failure.
+			if err != nil {
+				return
+			}
+		}
+	}()
+
+	// Check if the taskQueue is nil, indicating that the queue has not been initialized.
+	// If the taskQueue is nil, return an error indicating that the channel is empty.
+	if p.taskQueue == nil {
+		return worker.ChanIsEmpty
+	}
+
+	// Use a select statement to check the state of the taskQueue channel.
+	// The purpose of this check is to see if the taskQueue channel has been closed.
+	select {
+	case <-p.taskQueue:
+		// If the channel is closed, return an error indicating that the channel is closed.
+		// This prevents adding tasks to a closed channel, which would cause a panic.
+		return worker.ChanIsClose
+	default:
+		// If the channel is not closed, continue execution without blocking.
+		// The default case allows the program to move on to adding the task to the queue.
+	}
+
+	// Add the provided task to the taskQueue for processing.
+	// This operation is non-blocking and will place the task in the queue to be picked up by a worker.
+	p.taskQueue <- task
+
+	// Return nil to indicate that the task was successfully added to the queue.
+	return nil
+}
+
 // RunningWorkers returns the current number of running workers in the pool.
 // It retrieves the count of active workers using atomic operations to ensure thread safety.
 func (p *Pool) RunningWorkers() int32 {
