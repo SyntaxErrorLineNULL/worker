@@ -274,3 +274,53 @@ func (p *Pool) Stop() {
 	}()
 
 }
+
+// workersShutdown handles the shutdown process for all workers in the pool.
+// It ensures that each worker is properly stopped and decrements the worker count accordingly.
+// This method recovers from any panic that occurs during the shutdown to avoid crashing the program.
+func (p *Pool) workersShutdown() <-chan struct{} {
+	defer func() {
+		if r := recover(); r != nil {
+			return
+		}
+	}()
+
+	// Create a channel to signal the completion of the shutdown process.
+	// This channel will be closed once all workers have stopped.
+	doneCh := make(chan struct{}, 1)
+
+	// Create a slice to hold the done channels of all workers.
+	// This slice will be used to wait for all workers to finish shutting down.
+	doneChs := make([]<-chan struct{}, 0, p.workerConcurrency.Load())
+
+	// Iterate over all workers in the pool.
+	for _, wr := range p.workers {
+		// Stop each wr that is not already stopped.
+		if wr.GetStatus() != worker.StatusWorkerStopped {
+			// If the worker is active, initiate its shutdown process by calling its Stop method.
+			// Collect the worker's done channel in the slice for later synchronization.
+			doneChs = append(doneChs, wr.Stop())
+		} else {
+			// If the worker is already stopped (e.g., due to context cancellation),
+			// decrement the worker count as this worker will no longer be active.
+			p.decrementWorkerCount()
+		}
+	}
+
+	// Wait for all workers to finish their shutdown process.
+	for _, ch := range doneChs {
+		// Block until each worker's done channel is closed, indicating that the worker has stopped.
+		<-ch
+		// Decrement the worker count after each worker completes its shutdown.
+		p.decrementWorkerCount()
+	}
+
+	// Send a signal on the done channel to indicate that the shutdown process is complete.
+	// This allows external entities to know when all workers have been successfully stopped.
+	doneCh <- struct{}{}
+	// Close the done channel to signal completion and ensure no further sends can occur.
+	close(doneCh)
+
+	// Return the done channel to allow external monitoring of the shutdown completion.
+	return doneCh
+}
