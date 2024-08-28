@@ -2,7 +2,6 @@ package worker
 
 import (
 	"context"
-	"errors"
 	"log"
 	"os"
 	"sync"
@@ -49,7 +48,7 @@ func (w *Worker) SetContext(ctx context.Context) error {
 	// should not be used. Return an error in this case to prevent setting
 	// an invalid context for the worker.
 	if ctx == nil {
-		return worker.ContextIsNil
+		return worker.ContextIsNilError
 	}
 
 	// Assign the provided context to the worker's context field.
@@ -72,7 +71,7 @@ func (w *Worker) SetQueue(queue chan worker.Task) error {
 		// If the receive operation fails, the channel is closed.
 		// Return an error indicating that the channel is closed.
 		if !ok {
-			return errors.New("queue chan is close")
+			return worker.ChanIsCloseError
 		}
 	// If the receive operation would block, continue without doing anything.
 	default:
@@ -94,15 +93,9 @@ func (w *Worker) Start(wg *sync.WaitGroup) {
 	// Check if the provided WaitGroup is nil.
 	// If nil, send an error to the worker's error channel and return.
 	if wg == nil {
-		// If a wait group is provided, decrement its counter to signal that the worker has completed its task.
-		if wg != nil {
-			// Decrement the WaitGroup counter to signal that the worker has completed its task.
-			wg.Done()
-		}
-
 		// If the WaitGroup is nil, send an error to the worker's error channel.
 		// This error indicates that the WaitGroup was not properly initialized and is required for worker synchronization.
-		w.errCh <- &worker.Error{Error: worker.WaitGroupIsNil, Instance: w}
+		w.errCh <- &worker.Error{Error: worker.WaitGroupIsNilError, Instance: w}
 
 		// Immediately return from the function since a nil WaitGroup is a critical issue.
 		// The worker cannot start properly without a valid WaitGroup to manage its task completion.
