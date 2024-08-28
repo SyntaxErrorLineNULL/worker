@@ -96,6 +96,17 @@ func (p *Pool) loop() {
 
 			// Exit the loop.
 			return
+		case workerError, ok := <-p.workerErrorCh:
+			if !ok {
+				break
+			}
+
+			if !p.stopped {
+				p.workerWg.Add(1)
+				// it is safe to add waiting, because in case of panic triggering,
+				// the waitGroup counter will be decreased afterwards.
+				go workerError.Instance.Start(p.workerWg)
+			}
 		}
 	}
 }
