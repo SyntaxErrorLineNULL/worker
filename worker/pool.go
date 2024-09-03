@@ -160,6 +160,18 @@ func (p *Pool) AddTaskInQueue(task worker.Task) (err error) {
 // It ensures that the worker is correctly initialized with the pool's context
 // and task queue, and handles any errors or panics that occur during the process.
 func (p *Pool) AddWorker(wr worker.Worker) (err error) {
+	// Check if the pool has been stopped. If it has, return an error indicating
+	// that no more workers can be added.
+	if p.stopped {
+		return worker.WorkerPoolStopError
+	}
+
+	// Check if the provided worker is nil. If it is, return an error indicating
+	// that a nil worker cannot be added.
+	if wr == nil {
+		return worker.WorkerIsNilError
+	}
+
 	// Use a defer statement to recover from any panic that occurs during the
 	// addition of the worker and convert it into an error.
 	defer func() {
@@ -265,7 +277,13 @@ func (p *Pool) decrementWorkerCount() {
 	p.workerConcurrency.Add(-1)
 }
 
+// Stop terminates the worker pool and all its associated workers.
+// It ensures a clean shutdown by canceling the pool's context, signaling
+// workers to stop, and waiting for all workers to finish before completing
+// the shutdown sequence.
 func (p *Pool) Stop() {
+	// Defer a function to recover from any panics that occur during the shutdown process.
+	// This ensures that if something goes wrong, the panic is logged, and the shutdown continues.
 	defer func() {
 		if r := recover(); r != nil {
 			p.logger.Println("stop pool panic")
@@ -273,6 +291,47 @@ func (p *Pool) Stop() {
 		}
 	}()
 
+	// Use sync.Once to ensure that the shutdown process is only executed once.
+	// This prevents the pool from being shut down multiple times, which could lead to errors.
+	p.onceStop.Do(func() {
+		// Lock the mutex to ensure that the shutdown process is thread-safe.
+		// This prevents other goroutines from interfering with the shutdown process.
+		p.mutex.Lock()
+		// Defer unlocking the mutex to ensure that it is always released, even if the shutdown fails.
+		defer p.mutex.Unlock()
+
+		// Call workersShutdown to stop all active workers gracefully.
+		// This method will ensure that each worker completes its current task before shutting down.
+		p.workersShutdown()
+
+		// Set the workers slice to nil to release the memory and indicate that the pool no longer has any workers.
+		p.workers = nil
+
+		// Cancel the pool's context, which will signal to any remaining tasks that they should stop.
+		// This is useful for stopping any long-running tasks that are still in progress.
+		p.contextCancelFunc()
+
+		// Mark the pool as stopped by setting the stopped flag to true.
+		// This prevents any new tasks from being submitted to the pool.
+		p.stopped = true
+
+		// Send a signal to the stopCh channel to indicate that the stop process has started.
+		// This can be used by other goroutines to wait for the shutdown to complete.
+		p.stopCh <- struct{}{}
+		// Close the stopCh channel to prevent any further sends on this channel.
+		// This also signals to any listeners that the stop process is complete.
+		close(p.stopCh)
+
+		// Return from the Do function. Since this is inside sync.Once, this code block will not be executed again.
+		return
+	})
+
+	// Wait for all workers to finish processing their current tasks before returning from the Stop method.
+	// This ensures that all tasks are completed before the pool is fully shut down.
+	p.workerWg.Wait()
+
+	// Return from the Stop method, indicating that the pool has been successfully stopped.
+	return
 }
 
 // workersShutdown handles the shutdown process for all workers in the pool.
