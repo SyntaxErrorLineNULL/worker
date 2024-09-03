@@ -1,3 +1,9 @@
+run:
+  # Leave existing less flexible setting for compatibility.
+  # Setting it to false will be equivalent to linters.tests-disable-all=true.
+  # Setting it to true will be equivalent to linters.tests-enable-all=true.
+  tests: false
+
 linters:
   # Set to true runs only fast linters.
   # Good option for 'lint on save', pre-commit hook or CI.
@@ -68,7 +74,7 @@ linters-settings:
       - rangeValCopy
 
   goimports:
-    local-prefixes: github.com/SyntaxErrorLineNULL/gocache
+    local-prefixes: git.insystem.su/1xChat/fileshandler
 
 issues:
   # Setting 0 to have all the results.
@@ -87,6 +93,6 @@ issues:
   fix: false
   exclude-use-default: false
   exclude-rules:
-    - path: _test\.go
+    - path: (.+)_test.go
       linters:
         - dupl
