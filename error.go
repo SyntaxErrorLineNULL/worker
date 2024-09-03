@@ -27,6 +27,16 @@ var (
 	// This error is used to prevent the creation of additional workers beyond the allowed limit,
 	// ensuring that the system's resources are managed efficiently and within expected constraints.
 	MaxWorkersReachedError = errors.New("maximum number of workers reached")
+
+	// WorkerIsNilError is an error that indicates an operation was attempted with a nil worker.
+	// This error is used to signal that a worker instance expected to be valid was found to be nil,
+	// and therefore the operation cannot proceed.
+	WorkerIsNilError = errors.New("worker is nil")
+
+	// WorkerPoolStopError is an error that indicates an operation was attempted on a stopped worker pool.
+	// This error is used to signal that the worker pool has been stopped, meaning no further work can be assigned
+	// or processed, and the operation should be terminated.
+	WorkerPoolStopError = errors.New("worker pool is stopped")
 )
 
 // Error encapsulates an error along with the reference to the Worker instance
