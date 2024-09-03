@@ -173,10 +173,6 @@ func (t *Task) Run() {
 		if t.wg != nil {
 			t.wg.Done()
 		}
-
-		// Return from the deferred function.
-		// This concludes the cleanup and recovery process, ensuring that the `Run` method can complete gracefully.
-		return
 	}()
 
 	// Check if the task has no timeout set (i.e., timeout is zero or negative).
@@ -206,8 +202,6 @@ func (t *Task) Run() {
 			if t.wg != nil {
 				t.wg.Done()
 			}
-			// Return from the function. Default value of err is nil if no panic occurs.
-			return
 		}()
 
 		// Call the initProcessing method to start the task's main processing logic, passing the context and done channel.
@@ -216,9 +210,6 @@ func (t *Task) Run() {
 			// Store the error that occurred during task processing.
 			t.err = err
 		}
-
-		// Default return value, indicating error stat.
-		return
 	}()
 
 	// Select block to wait for the completion of the main function or the timeout.
@@ -282,10 +273,6 @@ func (t *Task) initProcessing(ctx context.Context, doneCh chan struct{}) (err er
 		// Notify that the task has completed, whether successfully or after a panic.
 		// Sending an empty struct to `doneCh` signals that the task's execution is done.
 		doneCh <- struct{}{}
-
-		// The return statement is implicit here, as the function ends.
-		// If an error occurred during processing, it will be returned.
-		return
 	}()
 
 	// start a task with a context that will be terminated after timeout,
@@ -313,7 +300,5 @@ func (t *Task) Stop() {
 			// Closing the channel is important for cleanup and to signal all listeners that no further events will occur.
 			close(t.stopCh)
 		}
-
-		return
 	})
 }
