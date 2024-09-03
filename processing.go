@@ -11,13 +11,4 @@ type Processing interface {
 	// It receives the task to be processed and the context.
 	// The result of the execution can be obtained via the Result channel
 	Processing(ctx context.Context, input interface{})
-
-	// ErrorHandler is invoked when an error occurs during processing or the context is canceled.
-	// It's an opportunity to handle errors gracefully.
-	ErrorHandler(ctx context.Context, input interface{})
-
-	// Result returns a channel that will be closed once the processing is complete.
-	// The channel will contain a single value of type Result.
-	// The caller is responsible for closing the channel after reading the result.
-	Result() chan interface{}
 }
