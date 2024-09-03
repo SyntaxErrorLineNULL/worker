@@ -277,8 +277,6 @@ func (w *Worker) Stop() <-chan struct{} {
 		w.stopCh <- struct{}{}
 		// Close the stop channel to indicate that no more stop signals will be sent.
 		close(w.stopCh)
-
-		return
 	})
 
 	// Return the channel to allow external monitoring of completion.
