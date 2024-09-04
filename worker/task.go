@@ -79,12 +79,13 @@ func (t *Task) SetWaitGroup(wg *sync.WaitGroup) error {
 // SetDoneChannel sets the provided channel as the done channel for the task.
 // It first checks if the provided channel is nil or already closed to prevent
 // setting an invalid channel, which could lead to runtime errors.
-// NOTE:
+//
+// Note: the channel must be closed after you receive a signal that the process is complete.
 func (t *Task) SetDoneChannel(done chan struct{}) error {
 	// Check if the provided channel is nil. A nil channel is invalid and
 	// cannot be used, so return an error in this case.
 	if done == nil {
-		return errors.New("channel cannot be nil")
+		return worker.ChanIsEmptyError
 	}
 
 	// Use a non-blocking select statement to check if the channel is closed.
@@ -94,7 +95,7 @@ func (t *Task) SetDoneChannel(done chan struct{}) error {
 	case <-done:
 		// If this case is executed, it means the channel has already been closed.
 		// Return an error indicating that a closed channel cannot be set.
-		return errors.New("cannot set a closed channel")
+		return worker.ChanIsCloseError
 	default:
 		// If the channel is not closed (i.e., it's still open), proceed to set it.
 		// This case will execute immediately if the channel is open.
