@@ -71,6 +71,51 @@ func (_c *Worker_GetError_Call) RunAndReturn(run func() chan *worker.Error) *Wor
 	return _c
 }
 
+// GetRetry provides a mock function with given fields:
+func (_m *Worker) GetRetry() int32 {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRetry")
+	}
+
+	var r0 int32
+	if rf, ok := ret.Get(0).(func() int32); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(int32)
+	}
+
+	return r0
+}
+
+// Worker_GetRetry_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRetry'
+type Worker_GetRetry_Call struct {
+	*mock.Call
+}
+
+// GetRetry is a helper method to define mock.On call
+func (_e *Worker_Expecter) GetRetry() *Worker_GetRetry_Call {
+	return &Worker_GetRetry_Call{Call: _e.mock.On("GetRetry")}
+}
+
+func (_c *Worker_GetRetry_Call) Run(run func()) *Worker_GetRetry_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Worker_GetRetry_Call) Return(_a0 int32) *Worker_GetRetry_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Worker_GetRetry_Call) RunAndReturn(run func() int32) *Worker_GetRetry_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetStatus provides a mock function with given fields:
 func (_m *Worker) GetStatus() worker.Status {
 	ret := _m.Called()
@@ -112,6 +157,39 @@ func (_c *Worker_GetStatus_Call) Return(_a0 worker.Status) *Worker_GetStatus_Cal
 }
 
 func (_c *Worker_GetStatus_Call) RunAndReturn(run func() worker.Status) *Worker_GetStatus_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Restart provides a mock function with given fields: wg
+func (_m *Worker) Restart(wg *sync.WaitGroup) {
+	_m.Called(wg)
+}
+
+// Worker_Restart_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Restart'
+type Worker_Restart_Call struct {
+	*mock.Call
+}
+
+// Restart is a helper method to define mock.On call
+//   - wg *sync.WaitGroup
+func (_e *Worker_Expecter) Restart(wg interface{}) *Worker_Restart_Call {
+	return &Worker_Restart_Call{Call: _e.mock.On("Restart", wg)}
+}
+
+func (_c *Worker_Restart_Call) Run(run func(wg *sync.WaitGroup)) *Worker_Restart_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*sync.WaitGroup))
+	})
+	return _c
+}
+
+func (_c *Worker_Restart_Call) Return() *Worker_Restart_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *Worker_Restart_Call) RunAndReturn(run func(*sync.WaitGroup)) *Worker_Restart_Call {
 	_c.Call.Return(run)
 	return _c
 }
