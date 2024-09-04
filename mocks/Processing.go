@@ -21,40 +21,6 @@ func (_m *Processing) EXPECT() *Processing_Expecter {
 	return &Processing_Expecter{mock: &_m.Mock}
 }
 
-// ErrorHandler provides a mock function with given fields: ctx, input
-func (_m *Processing) ErrorHandler(ctx context.Context, input interface{}) {
-	_m.Called(ctx, input)
-}
-
-// Processing_ErrorHandler_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ErrorHandler'
-type Processing_ErrorHandler_Call struct {
-	*mock.Call
-}
-
-// ErrorHandler is a helper method to define mock.On call
-//   - ctx context.Context
-//   - input interface{}
-func (_e *Processing_Expecter) ErrorHandler(ctx interface{}, input interface{}) *Processing_ErrorHandler_Call {
-	return &Processing_ErrorHandler_Call{Call: _e.mock.On("ErrorHandler", ctx, input)}
-}
-
-func (_c *Processing_ErrorHandler_Call) Run(run func(ctx context.Context, input interface{})) *Processing_ErrorHandler_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(interface{}))
-	})
-	return _c
-}
-
-func (_c *Processing_ErrorHandler_Call) Return() *Processing_ErrorHandler_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *Processing_ErrorHandler_Call) RunAndReturn(run func(context.Context, interface{})) *Processing_ErrorHandler_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // Processing provides a mock function with given fields: ctx, input
 func (_m *Processing) Processing(ctx context.Context, input interface{}) {
 	_m.Called(ctx, input)
