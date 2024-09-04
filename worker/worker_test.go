@@ -428,7 +428,7 @@ func TestWorker(t *testing.T) {
 		case workerError := <-worker.GetError():
 			// Assert that the error received is the expected panic error.
 			// This verifies that the worker correctly identified and reported the panic error.
-			assert.ErrorIs(t, workerError.Error, ErrorMockPanic)
+			assert.ErrorIs(t, workerError.Error, errMockPanic)
 			// Assert that the error instance matches the worker that encountered the error.
 			// This confirms that the correct worker is associated with the reported error.
 			assert.Equal(t, worker, workerError.Instance)
@@ -440,5 +440,92 @@ func TestWorker(t *testing.T) {
 			t.Error("Failed to stop worker within expected time")
 		}
 
+	})
+
+	// RestartWorker tests the behavior of the `Restart` method for a worker in the worker pool system.
+	// It ensures that the worker can be restarted correctly and that the retry count is incremented as expected.
+	// Additionally, it verifies that the worker transitions to an idle state upon restart and properly shuts down
+	// when stopped. The test checks that the worker's status and retry count match the expected values after the restart
+	// operation and confirms that the worker's error channel is closed after stopping.
+	t.Run("RestartWorker", func(t *testing.T) {
+		// Create a context with cancellation to manage the lifecycle of the worker and ensure proper cleanup.
+		// The context will allow the worker to be cancelled if necessary.
+		ctx, cancel := context.WithCancel(context.Background())
+		// Ensure that the context cancellation function is called at the end of the test.
+		// This prevents resource leaks by ensuring proper cleanup after the test completes.
+		defer cancel()
+
+		// retryCount represents the number of times an operation should be retried
+		// in case of failure. Here, it is initialized to 1, meaning the operation
+		// will be attempted once before considering it a failure. This value can
+		// be adjusted based on the desired retry strategy to handle transient errors.
+		retryCount := int32(1)
+
+		// Create a new Worker instance with ID 1, a timeout of 1 second, and a logger.
+		// This initializes the worker with specified parameters and ensures that it is properly set up.
+		worker := NewWorker(1)
+		// Assert that the worker instance is not nil.
+		// This checks that the worker was successfully created and is not a zero value.
+		assert.NotNil(t, worker, "Worker should be successfully created")
+
+		// Assert that the initial retry count of the worker is zero.
+		// This verifies that the worker starts with a retry count of zero before any restarts occur.
+		assert.Equal(t, int32(0), worker.GetRetry(), "Worker retry count should be zero initially")
+
+		// Set the worker's context to the new background context.
+		// This tests the SetContext method by providing a valid context.
+		err := worker.SetContext(ctx)
+		// Assert that no error occurred when setting the context.
+		// This ensures that the SetContext method works as expected when a valid context is provided.
+		assert.NoError(t, err, "Expected no error when setting a valid context")
+
+		// Create a channel with a buffer size of 1 to receive tasks.
+		// This channel will be used as the job queue for the worker.
+		taskQueue := make(chan wr.Task, 1)
+
+		// Set the worker's queue to the open channel.
+		// This tests that the worker can successfully use the open channel as its job queue.
+		err = worker.SetQueue(taskQueue)
+		// Assert that no error is returned when setting an open channel.
+		// This confirms that setting an open channel is handled correctly by the worker.
+		assert.NoError(t, err, "Setting an open channel should not produce an error")
+
+		// Increment the WaitGroup counter by 1 to account for the worker's goroutine.
+		// This is necessary to properly synchronize the test's main goroutine with the worker's goroutine.
+		wg.Add(1)
+		// Start the worker in a separate goroutine to allow it to run concurrently.
+		// The worker will begin processing tasks in this goroutine.
+		go worker.Restart(wg)
+
+		// Sleep for a short duration to allow the worker to transition to its initial state.
+		// This delay simulates the time needed for the worker to initialize.
+		time.Sleep(10 * time.Millisecond)
+
+		// Assert that the worker's initial status is idle.
+		// This ensures that the worker is in the expected initial state before processing any jobs.
+		assert.Equal(t, wr.StatusWorkerIdle, worker.GetStatus(), "Worker should be idle after starting")
+
+		// Assert that the worker's retry count matches the expected value.
+		// This checks that the worker's restart process has incremented the retry count correctly.
+		assert.Equal(t, retryCount, worker.GetRetry(), "Worker retry count should match the expected retry count")
+
+		// Wait for the worker to stop or time out.
+		// This block manages the completion of the worker's lifecycle and handles any potential delays.
+		select {
+		case <-worker.Stop():
+			// Worker completed successfully.
+			// Any assertions or checks can be placed here if needed.
+			assert.Equal(t, wr.StatusWorkerStopped, worker.GetStatus(), "Expected worker status to be stopped")
+
+			// Attempt to read from the worker's error channel.
+			// This checks whether the channel is closed after the worker has stopped.
+			_, ok := <-worker.errCh
+			// Assert that the error channel is closed by verifying that the 'ok' value is false.
+			// If 'ok' is false, it indicates that the channel is closed, meaning no further errors can be received.
+			assert.False(t, ok, "Error channel should be closed after worker stops")
+
+		case <-time.After(2 * time.Second):
+			t.Error("Worker did not stop within the expected time.")
+		}
 	})
 }
