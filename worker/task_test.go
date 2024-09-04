@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	wr "github.com/SyntaxErrorLineNULL/worker"
 	"runtime"
 	"sync"
 	"testing"
@@ -88,6 +89,36 @@ func TestTask(t *testing.T) {
 		// The expected value is the done channel cast to a send-only channel.
 		// The actual value is the task's doneCh field.
 		assert.Equal(t, (chan<- struct{})(doneCh), task.doneCh, "expected the task's done channel to be set correctly")
+	})
+
+	// SetCloseChannel tests the behavior of the `SetDoneChannel` method when a closed channel is provided.
+	// It ensures that the method correctly handles the scenario where an attempt is made to set a channel
+	// that is already closed. The test verifies that an appropriate error is returned, specifically
+	// checking for the `wr.ChanIsCloseError` type, which indicates that the channel is no longer usable.
+	t.Run("SetCloseChannel", func(t *testing.T) {
+		// Create a channel of type struct{} to be used as the "done" channel.
+		// This channel will be used to signal completion or termination.
+		doneCh := make(chan struct{})
+
+		// Create a new instance of Task.
+		// This instance will be used to test the behavior of the SetDoneChannel method.
+		task := &Task{}
+
+		// Close the done channel to simulate a scenario where the channel is already closed.
+		// This tests how the SetDoneChannel method handles the situation when an attempt is made to set a closed channel.
+		close(doneCh)
+
+		// Call the SetDoneChannel method on the Task instance, passing the closed done channel.
+		// This method is expected to handle the closed channel appropriately, typically by returning an error.
+		err := task.SetDoneChannel(doneCh)
+
+		// Assert that an error is returned when attempting to set a closed channel.
+		// This confirms that the method behaves as expected and handles the error condition properly.
+		assert.Error(t, err, "Expected an error when setting a closed channel")
+
+		// Assert that the returned error is of the specific type wr.ChanIsCloseError.
+		// This ensures that the error returned matches the expected error type for a closed channel.
+		assert.ErrorIs(t, err, wr.ChanIsCloseError, "Expected error to be wr.ChanIsCloseError")
 	})
 
 	// SetEmptyChannel tests the SetDoneChannel method of the Task struct
