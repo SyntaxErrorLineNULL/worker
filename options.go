@@ -16,13 +16,11 @@ type Options struct {
 	//
 	// Note: the channel must be closed after the worker pool is stopped.
 	Queue chan Task
-
 	// WorkerCount specifies the number of workers that will be spawned in the pool.
 	// This determines how many tasks can be processed concurrently.
 	WorkerCount int32
-
 	// MaxRetryWorkerRestart defines the maximum number of times a worker can be restarted
 	// in case of failure before it is considered as a critical issue and further restarts
 	// are stopped. This helps in preventing endless restarts in case of persistent errors.
-	MaxRetryWorkerRestart int
+	MaxRetryWorkerRestart int32
 }
