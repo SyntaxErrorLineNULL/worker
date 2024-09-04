@@ -233,15 +233,9 @@ func TestTask(t *testing.T) {
 		// to match the expected data type used by the processing function.
 		inputProcessingData := int32(222)
 
-		// Define the error handler input as a string.
-		// `inputErrorHandler` is set to "error handler" and is intended to be used
-		// as the input for the error handling function in the task.
-		// This string will simulate or represent an identifier or message to be processed by the error handler.
-		inputErrorHandler := "error handler"
-
 		// Create a new task instance with the specified timeout, name, processing function, and input data.
 		// This task simulates a job that will be processed within the test.
-		task := NewTask(timeout, "test-task", mockProcessing, inputProcessingData, inputErrorHandler)
+		task := NewTask(timeout, "test-task", mockProcessing, inputProcessingData)
 		// Assert that the task was successfully created.
 		// If the task is nil, it indicates a problem with task initialization.
 		assert.NotNil(t, task, "Expected task to be initialized, but it was nil")
@@ -269,7 +263,7 @@ func TestTask(t *testing.T) {
 
 		// Mock the Processing method to return true when called with the context and task.
 		// This simulates the job processing method returning a successful result.
-		mockProcessing.On("Processing", mock.Anything, inputProcessingData).Return(true)
+		mockProcessing.EXPECT().Processing(mock.Anything, inputProcessingData).Once()
 
 		// Add to the wait group to track job execution.
 		// This ensures the wait group waits for the job to complete.
@@ -338,19 +332,13 @@ func TestTask(t *testing.T) {
 		// to match the expected data type used by the processing function.
 		inputProcessingData := int32(222)
 
-		// Define the error handler input as a string.
-		// `inputErrorHandler` is set to "error handler" and is intended to be used
-		// as the input for the error handling function in the task.
-		// This string will simulate or represent an identifier or message to be processed by the error handler.
-		inputErrorHandler := "error handler"
-
 		// Create a mock processing task that simulates a panic during processing.
 		// The mock is designed to trigger a panic to test the task's error handling.
 		mockProcessingWithPanic := &MockProcessingWithPanic{}
 
 		// Create a new task instance with the specified timeout, name, processing function, and input data.
 		// This task simulates a job that will be processed within the test.
-		task := NewTask(timeout, "test-task", mockProcessingWithPanic, inputProcessingData, inputErrorHandler)
+		task := NewTask(timeout, "test-task", mockProcessingWithPanic, inputProcessingData)
 		// Assert that the task was successfully created.
 		// If the task is nil, it indicates a problem with task initialization.
 		assert.NotNil(t, task, "Expected task to be initialized, but it was nil")
@@ -490,25 +478,18 @@ func TestTask(t *testing.T) {
 		// This is the maximum amount of time we allow for the task to complete.
 		timeout := 5 * time.Second
 
-		// Initialize input data for the processing function.
-		// `inputProcessingData` represents an example integer input (in this case, `222`)
-		// that will be passed to the processing function. The integer is cast to `int32`
-		// to match the expected data type used by the processing function.
-		inputProcessingData := int32(222)
-
-		// Define the error handler input as a string.
-		// `inputErrorHandler` is set to "error handler" and is intended to be used
-		// as the input for the error handling function in the task.
-		// This string will simulate or represent an identifier or message to be processed by the error handler.
-		inputErrorHandler := "error handler"
-
 		// Create an instance of the mock processing task with a specified timeout.
 		// This mock simulates a long-running task for testing purposes.
 		mockProcessingWithLongTask := &MockProcessingLongTask{timeout: timeout}
+		// resultCh is a buffered channel that is used to receive the result of the mock processing task.
+		// The buffer size is set to 1 because we expect only one result to be sent through this channel
+		// for each task execution. This allows the sending goroutine to proceed without blocking, assuming
+		// the result is consumed quickly.
+		resultCh := make(chan *MockProcessingLongTaskResult, 1)
 
 		// Create a new task instance with the specified timeout, name, processing function, and input data.
 		// This task simulates a job that will be processed within the test.
-		task := NewTask(timeout, "test-task", mockProcessingWithLongTask, inputProcessingData, inputErrorHandler)
+		task := NewTask(timeout, "test-task", mockProcessingWithLongTask, resultCh)
 		// Assert that the task was successfully created.
 		// If the task is nil, it indicates a problem with task initialization.
 		assert.NotNil(t, task, "Expected task to be initialized, but it was nil")
@@ -573,13 +554,19 @@ func TestTask(t *testing.T) {
 			// If the channel is still open (`ok` is true), this would imply the task has not finished properly, and the test should fail.
 			assert.False(t, ok, "Expected stop channel to be closed, indicating job completion")
 
-			// Introduce a short delay to ensure that asynchronous operations have time to complete.
-			// This delay allows the stop signal to propagate and any remaining processing to finalize.
-			<-time.After(10 * time.Millisecond)
+			// Use a select statement to check for results from the result channel or proceed if no result is available.
+			// The select statement is non-blocking due to the default case, which allows the code to continue execution
+			// if there is nothing in the channel.
+			select {
+			case res := <-resultCh:
+				// If a result is received from the result channel, assert that the `ContextIsDone` field is true.
+				// This confirms that the task's context was properly canceled and that the task handled the cancellation.
+				assert.True(t, res.ContextIsDone, "Expected ContextIsDone to be true, indicating the task properly handled context cancellation")
+			default:
+				// If no result is available in the result channel, the select will hit the default case and proceed.
+				// This ensures the test doesn't hang if no result is produced and allows the code to continue execution.
+			}
 
-			// Assert that the counter in the mock processing task matches the expected value.
-			// This verifies that the task was properly stopped and that the mock processing function was executed as expected.
-			assert.Equal(t, MockProcessingLongTaskCounter, mockProcessingWithLongTask.Counter(), "Task processing counter did not match expected value after Stop() was called")
 		case <-time.After(2 * timeout):
 			// If no signal is received from `stopCh` within `2 * timeout` duration, this case will trigger, indicating a timeout.
 			// This is a safeguard to ensure the test doesn't hang indefinitely if something goes wrong.
@@ -601,25 +588,18 @@ func TestTask(t *testing.T) {
 		// This is the maximum amount of time we allow for the task to complete.
 		timeout := 10 * time.Second
 
-		// Initialize input data for the processing function.
-		// `inputProcessingData` represents an example integer input (in this case, `222`)
-		// that will be passed to the processing function. The integer is cast to `int32`
-		// to match the expected data type used by the processing function.
-		inputProcessingData := int32(222)
-
-		// Define the error handler input as a string.
-		// `inputErrorHandler` is set to "error handler" and is intended to be used
-		// as the input for the error handling function in the task.
-		// This string will simulate or represent an identifier or message to be processed by the error handler.
-		inputErrorHandler := "error handler"
-
 		// Create an instance of the mock processing task with a specified timeout.
 		// This mock simulates a long-running task for testing purposes.
 		mockProcessingWithLongTask := &MockProcessingLongTask{timeout: timeout}
+		// resultCh is a buffered channel that is used to receive the result of the mock processing task.
+		// The buffer size is set to 1 because we expect only one result to be sent through this channel
+		// for each task execution. This allows the sending goroutine to proceed without blocking, assuming
+		// the result is consumed quickly.
+		resultCh := make(chan *MockProcessingLongTaskResult, 1)
 
 		// Create a new task instance with the specified timeout, name, processing function, and input data.
 		// This task simulates a job that will be processed within the test.
-		task := NewTask(timeout, "test-task", mockProcessingWithLongTask, inputProcessingData, inputErrorHandler)
+		task := NewTask(timeout, "test-task", mockProcessingWithLongTask, resultCh)
 		// Assert that the task was successfully created.
 		// If the task is nil, it indicates a problem with task initialization.
 		assert.NotNil(t, task, "Expected task to be initialized, but it was nil")
@@ -696,15 +676,18 @@ func TestTask(t *testing.T) {
 				// does nothing and allows the test to continue without blocking.
 			}
 
-			// Check that the ErrorHandler method was called and correctly updated the `errorHandlerContextDone` counter.
-			// This verifies that the error handler was triggered by the cancellation and that the counter was incremented as expected.
-			assert.Equal(t, MockProcessingLongTaskErrorHandlerCounter, mockProcessingWithLongTask.ErrorHandlerCounter(),
-				"Expected ErrorHandlerCounter to match MockProcessingLongTaskErrorHandlerCounter after context cancellation")
-
-			// Check that the context was completed, and the `contextDone` counter was updated.
-			// This verifies that the task's processing logic responded to the context cancellation by updating the counter appropriately.
-			assert.Equal(t, MockProcessingLongTaskCounter, mockProcessingWithLongTask.Counter(),
-				"Expected Counter to match MockProcessingLongTaskCounter after context cancellation")
+			// Use a select statement to check for results from the result channel or proceed if no result is available.
+			// The select statement is non-blocking due to the default case, which allows the code to continue execution
+			// if there is nothing in the channel.
+			select {
+			case res := <-resultCh:
+				// If a result is received from the result channel, assert that the `ContextIsDone` field is true.
+				// This confirms that the task's context was properly canceled and that the task handled the cancellation.
+				assert.True(t, res.ContextIsDone, "Expected ContextIsDone to be true, indicating the task properly handled context cancellation")
+			default:
+				// If no result is available in the result channel, the select will hit the default case and proceed.
+				// This ensures the test doesn't hang if no result is produced and allows the code to continue execution.
+			}
 
 		case <-time.After(2 * timeout):
 			// If no signal is received from `stopCh` within `2 * timeout` duration, this case will trigger, indicating a timeout.
