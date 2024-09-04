@@ -28,9 +28,6 @@ type Task struct {
 	processing worker.Processing
 	// processingInput holds the input data required by the processing module to execute the task.
 	processingInput interface{}
-	// processingErrorHandlerInput holds the input data required by the error handler.
-	// This is used if the task encounters an error or needs to perform compensatory actions after a failure.
-	processingErrorHandlerInput interface{}
 	// doneCh is a signaling channel used to notify external handlers when the task is complete.
 	// It's an optional channel, primarily used for coordinating task completion with other processes.
 	doneCh chan<- struct{}
@@ -51,15 +48,14 @@ type Task struct {
 
 // NewTask initializes a new Task instance with the provided parameters.
 // The function takes the maximum timeout, task name, processing module, and inputs for processing and error handling.
-func NewTask(timeout time.Duration, taskName string, processing worker.Processing, processingInput, errorHandlerInput interface{}) *Task {
+func NewTask(timeout time.Duration, taskName string, processing worker.Processing, processingInput interface{}) *Task {
 	return &Task{
-		timeout:                     timeout,
-		name:                        taskName,
-		processing:                  processing,
-		processingInput:             processingInput,
-		processingErrorHandlerInput: errorHandlerInput,
-		err:                         nil,
-		stopCh:                      make(chan struct{}, 1),
+		timeout:         timeout,
+		name:            taskName,
+		processing:      processing,
+		processingInput: processingInput,
+		err:             nil,
+		stopCh:          make(chan struct{}, 1),
 	}
 }
 
@@ -83,6 +79,7 @@ func (t *Task) SetWaitGroup(wg *sync.WaitGroup) error {
 // SetDoneChannel sets the provided channel as the done channel for the task.
 // It first checks if the provided channel is nil or already closed to prevent
 // setting an invalid channel, which could lead to runtime errors.
+// NOTE:
 func (t *Task) SetDoneChannel(done chan struct{}) error {
 	// Check if the provided channel is nil. A nil channel is invalid and
 	// cannot be used, so return an error in this case.
@@ -229,7 +226,6 @@ func (t *Task) Run() {
 	// A signal was received from the done channel, indicating that the primary function has completed its execution.
 	// This means the task finished its processing before the timeout or stop signal occurred.
 	case <-done:
-		fmt.Println("\nDone ch")
 		// Close the done channel to signal that no more events will occur on this channel.
 		// Closing the channel is an important step to clean up resources and prevent any further sends on this channel.
 		close(done)
@@ -246,13 +242,6 @@ func (t *Task) Run() {
 		// If the task's context times out or is canceled, this case will be triggered.
 		// Cancel the task's context to halt any ongoing processing.
 		cancel()
-
-		// Why a new context and not use t.parentCtx / taskContext?
-		// The point is that if the handler context is completed, but Processing itself is not completed,
-		// ErrorHandler is called, and it can execute its logic with the new context.
-		t.processing.ErrorHandler(context.Background(), t.processingErrorHandlerInput)
-
-		return
 	}
 }
 
