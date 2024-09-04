@@ -3,11 +3,6 @@ package worker
 import "errors"
 
 var (
-	// WaitGroupIsNilError is an error indicating that a nil wait group was provided.
-	// This error is used to signal that an operation requiring a non-nil wait group
-	// encountered an invalid input, preventing proper synchronization.
-	WaitGroupIsNilError = errors.New("wait group is nil")
-
 	// ContextIsNilError is an error indicating that a nil context was provided.
 	// This error is used to signal that an operation requiring a non-nil context
 	// encountered an invalid input, which could disrupt the operation's control flow.
