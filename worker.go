@@ -22,6 +22,12 @@ type Worker interface {
 	// Returns an error if the queue is nil or invalid.
 	SetQueue(queue chan Task) error
 
+	// Restart attempts to restart the worker by incrementing the retry count
+	// and then invoking the Start method to resume the worker's operation.
+	// This method is used to recover a worker that may have encountered an issue,
+	// tracking the number of recovery attempts.
+	Restart(wg *sync.WaitGroup)
+
 	// Start begins the worker's operation, processing tasks from the assigned queue.
 	// It requires a sync.WaitGroup to manage the concurrent execution of workers.
 	// The WaitGroup is used to ensure that all workers complete their tasks before
@@ -44,4 +50,9 @@ type Worker interface {
 	// The channel carries errors encountered during task processing. This allows
 	// the system to log, handle, or react to errors in a centralized manner.
 	GetError() chan *Error
+
+	// GetRetry returns the current retry count for the worker.
+	// The retry count indicates the number of attempts made to restart the worker
+	// in an effort to restore its operation after encountering an issue.
+	GetRetry() int32
 }
