@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"sync"
+	"sync/atomic"
 
 	"github.com/SyntaxErrorLineNULL/worker"
 )
@@ -21,6 +22,7 @@ type Worker struct {
 	status         worker.Status      // Current status of the worker (e.g., running, stopped).
 	errCh          chan *worker.Error // Channel to send and receive errors that occur in the worker.
 	onceStop       sync.Once          // Ensures the stop process is only executed once.
+	retryCount     atomic.Int32       // Number of attempts to bring the worker back to life.
 	logger         *log.Logger
 }
 
@@ -84,24 +86,23 @@ func (w *Worker) SetQueue(queue chan worker.Task) error {
 	return nil
 }
 
+// Restart attempts to restart the worker by incrementing the retry count
+// and then invoking the Start method to resume the worker's operation.
+// The retry count is incremented to track the number of recovery attempts.
+func (w *Worker) Restart(wg *sync.WaitGroup) {
+	// Increment the retry count to indicate a new recovery attempt.
+	w.retryCount.Add(1)
+
+	// Start the worker again.
+	w.Start(wg)
+}
+
 // Start begins the worker's execution cycle. It initializes the worker's status,
 // manages tasks from the job queue, and handles errors and context cancellations.
 // The method uses a WaitGroup to signal when the worker has finished its work and includes
 // mechanisms for recovery from panics to ensure that the worker continues operating smoothly
 // even if unexpected errors occur.
 func (w *Worker) Start(wg *sync.WaitGroup) {
-	// Check if the provided WaitGroup is nil.
-	// If nil, send an error to the worker's error channel and return.
-	if wg == nil {
-		// If the WaitGroup is nil, send an error to the worker's error channel.
-		// This error indicates that the WaitGroup was not properly initialized and is required for worker synchronization.
-		w.errCh <- &worker.Error{Error: worker.WaitGroupIsNilError, Instance: w}
-
-		// Immediately return from the function since a nil WaitGroup is a critical issue.
-		// The worker cannot start properly without a valid WaitGroup to manage its task completion.
-		return
-	}
-
 	// As soon as a worker is created, it is necessarily in the status of StatusWorkerIdle.
 	// This indicates that the worker is ready but currently not processing any jobs.
 	w.setStatus(worker.StatusWorkerIdle)
@@ -312,4 +313,12 @@ func (w *Worker) GetStatus() worker.Status {
 func (w *Worker) GetError() chan *worker.Error {
 	// Return the error channel associated with the worker.
 	return w.errCh
+}
+
+// GetRetry returns the current retry count for the worker.
+// The retry count indicates the number of attempts made to restart the worker
+// in an effort to restore its operation if it encountered an issue.
+func (w *Worker) GetRetry() int32 {
+	// Load and return the current value of retryCount.
+	return w.retryCount.Load()
 }
