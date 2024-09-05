@@ -32,16 +32,22 @@ func TestWorker(t *testing.T) {
 	// and that all required channels are initialized. This test ensures that
 	// the worker is correctly set up with the specified ID, timeout, and initial status.
 	t.Run("InitWorker", func(t *testing.T) {
-		// Create a new Worker instance with ID 1, a timeout of 1 second, and a logger.
-		// This initializes the worker with specified parameters and ensures that it is properly set up.
-		worker := NewWorker(1)
+		// Define a name for the worker to be used in this test.
+		// This name is used to initialize and identify the worker instance.
+		workerName := "workerName"
+
+		// Create a new Worker instance with the specified name.
+		// The NewWorker function initializes a worker with a unique name and default settings.
+		// The worker is expected to be properly set up with a timeout and a logger.
+		worker := NewWorker(workerName)
 		// Assert that the worker instance is not nil.
 		// This checks that the worker was successfully created and is not a zero value.
 		assert.NotNil(t, worker, "Worker should be successfully created")
 
-		// Assert that the worker's ID is set to 1.
-		// This verifies that the worker has been initialized with the correct ID.
-		assert.Equal(t, int64(1), worker.workerID, "Worker ID should be 1")
+		// Assert that the worker's name is correctly set to the given name.
+		// The String method returns the worker's name, which should match the provided workerName.
+		// This confirms that the worker's name was initialized correctly.
+		assert.Equal(t, workerName, worker.String(), "Worker name should match the provided name")
 
 		// Assert that the worker's status is initially set to `StatusWorkerIdle`.
 		// This confirms that the worker starts in an idle state, ready to process jobs.
@@ -61,9 +67,14 @@ func TestWorker(t *testing.T) {
 	// The test ensures that setting an open channel succeeds, while setting a closed channel produces an error,
 	// validating proper queue management within the worker.
 	t.Run("SetQueue", func(t *testing.T) {
-		// Create a new Worker instance with ID 1, a timeout of 1 second, and a logger.
-		// This initializes the worker with specified parameters and ensures that it is properly set up.
-		worker := NewWorker(1)
+		// Define a name for the worker to be used in this test.
+		// This name is used to initialize and identify the worker instance.
+		workerName := "workerName"
+
+		// Create a new Worker instance with the specified name.
+		// The NewWorker function initializes a worker with a unique name and default settings.
+		// The worker is expected to be properly set up with a timeout and a logger.
+		worker := NewWorker(workerName)
 		// Assert that the worker instance is not nil.
 		// This checks that the worker was successfully created and is not a zero value.
 		assert.NotNil(t, worker, "Worker should be successfully created")
@@ -100,9 +111,9 @@ func TestWorker(t *testing.T) {
 	// does not change the existing context. This test ensures proper behavior when managing
 	// the worker's context during its lifecycle.
 	t.Run("SetContext", func(t *testing.T) {
-		// Create a new Worker instance with ID 1, a timeout of 1 second, and a logger.
+		// Create a new Worker instance with a unique name, a timeout of 1 second, and a logger.
 		// This initializes the worker with specified parameters and ensures that it is properly set up.
-		worker := NewWorker(1)
+		worker := NewWorker("workerSetContext")
 		// Assert that the worker instance is not nil.
 		// This checks that the worker was successfully created and is not a zero value.
 		assert.NotNil(t, worker, "Worker should be successfully created")
@@ -146,9 +157,9 @@ func TestWorker(t *testing.T) {
 		// This prevents resource leaks by ensuring proper cleanup after the test completes.
 		defer cancel()
 
-		// Create a new Worker instance with ID 1, a timeout of 1 second, and a logger.
+		// Create a new Worker instance with a unique name, a timeout of 1 second, and a logger.
 		// This initializes the worker with specified parameters and ensures that it is properly set up.
-		worker := NewWorker(1)
+		worker := NewWorker("workerGetStatusWithRun")
 		// Assert that the worker instance is not nil.
 		// This checks that the worker was successfully created and is not a zero value.
 		assert.NotNil(t, worker, "Worker should be successfully created")
@@ -219,9 +230,9 @@ func TestWorker(t *testing.T) {
 		// The context will allow the worker to be cancelled if necessary.
 		ctx, cancel := context.WithCancel(context.Background())
 
-		// Create a new Worker instance with ID 1, a timeout of 1 second, and a logger.
+		// Create a new Worker instance with a unique name, a timeout of 1 second, and a logger.
 		// This initializes the worker with specified parameters and ensures that it is properly set up.
-		worker := NewWorker(1)
+		worker := NewWorker("workerContextDone")
 		// Assert that the worker instance is not nil.
 		// This checks that the worker was successfully created and is not a zero value.
 		assert.NotNil(t, worker, "Worker should be successfully created")
@@ -299,9 +310,9 @@ func TestWorker(t *testing.T) {
 		// This context will manage the worker's lifecycle and cancellation signals.
 		ctx := context.Background()
 
-		// Create a new Worker instance with ID 1, a timeout of 1 second, and a logger.
+		// Create a new Worker instance with a unique name, a timeout of 1 second, and a logger.
 		// This initializes the worker with specified parameters and ensures that it is properly set up.
-		worker := NewWorker(1)
+		worker := NewWorker("workerSuccessStop")
 		// Assert that the worker instance is not nil.
 		// This checks that the worker was successfully created and is not a zero value.
 		assert.NotNil(t, worker, "Worker should be successfully created")
@@ -372,9 +383,9 @@ func TestWorker(t *testing.T) {
 		// This context will manage the worker's lifecycle and cancellation signals.
 		ctx := context.Background()
 
-		// Create a new Worker instance with ID 1, a timeout of 1 second, and a logger.
+		// Create a new Worker instance with a unique name, a timeout of 1 second, and a logger.
 		// This initializes the worker with specified parameters and ensures that it is properly set up.
-		worker := NewWorker(1)
+		worker := NewWorker("workerWorkerPanic")
 		// Assert that the worker instance is not nil.
 		// This checks that the worker was successfully created and is not a zero value.
 		assert.NotNil(t, worker, "Worker should be successfully created")
@@ -461,9 +472,9 @@ func TestWorker(t *testing.T) {
 		// be adjusted based on the desired retry strategy to handle transient errors.
 		retryCount := int32(1)
 
-		// Create a new Worker instance with ID 1, a timeout of 1 second, and a logger.
+		// Create a new Worker instance with unique name, a timeout of 1 second, and a logger.
 		// This initializes the worker with specified parameters and ensures that it is properly set up.
-		worker := NewWorker(1)
+		worker := NewWorker("workerRestartWorker")
 		// Assert that the worker instance is not nil.
 		// This checks that the worker was successfully created and is not a zero value.
 		assert.NotNil(t, worker, "Worker should be successfully created")
