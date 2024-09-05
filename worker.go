@@ -11,15 +11,24 @@ import (
 //
 //go:generate mockery --name=Worker
 type Worker interface {
+	// String returns a string representation of the Worker.
+	// Typically, this is the worker's name, which is useful for logging and debugging purposes.
+	String() string
+
 	// SetContext assigns a context to the worker.
 	// The context is used to control the worker's execution and can be used to
 	// cancel operations or signal timeouts. Returns an error if the context is nil
 	// or if there's an issue setting the context.
+	//
+	// NOTE: Context is passed from the worker pool (parent) to manage the state of the worker
 	SetContext(ctx context.Context) error
 
 	// SetQueue assigns a task queue to the worker.
 	// The worker will listen to this queue for incoming tasks to process.
 	// Returns an error if the queue is nil or invalid.
+	//
+	// NOTE: The channel must be closed after the worker pool is stopped.
+	// Otherwise all the workers will simply be stopped and stop working.
 	SetQueue(queue chan Task) error
 
 	// Restart attempts to restart the worker by incrementing the retry count
