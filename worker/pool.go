@@ -11,48 +11,92 @@ import (
 	"github.com/SyntaxErrorLineNULL/worker"
 )
 
+// Pool represents a worker pool that manages a collection of worker instances.
+// It handles task processing, worker lifecycle management, and provides mechanisms for
+// graceful start and stop operations.
 type Pool struct {
-	ctx                   context.Context    // Parent context for the pool.
-	contextCancelFunc     context.CancelFunc // Cancel function for the pool's context.
-	taskQueue             chan worker.Task   // Channel for queueing task's.
-	workers               []worker.Worker    // Slice to hold worker instances.
-	maxWorkersCount       int32              // Maximum number of workers in the pool.
-	workerConcurrency     atomic.Int32       // Number of currently running workers.
-	maxRetryWorkerRestart int
-	workerWg              *sync.WaitGroup
-	stopCh                chan struct{}      // Channel to signal stopping the pool.
-	mutex                 sync.Mutex         // Mutex for locking access to the pool.
-	onceStart             sync.Once          // Used for a one-time action (starting the pool).
-	onceStop              sync.Once          // Used for a one-time action (stopping the pool).
-	stopped               bool               // flag signaling that the worker pool has already been stopped. The flag is needed to understand whether it is necessary to restore some worker after its fall, perhaps the worker pool is already stopped.
-	workerErrorCh         chan *worker.Error // A channel for worker error. It is needed so that in case of panic we can restore the Worker's operation.
-	logger                *log.Logger
+	// ctx holds the parent context for the pool, which controls the lifecycle of the pool.
+	// It allows for canceling the pool's operations and handling timeouts.
+	ctx context.Context
+	// contextCancelFunc is the cancel function associated with the pool's context.
+	// It is used to cancel the context and stop the pool's operations.
+	contextCancelFunc context.CancelFunc
+	// taskQueue is a channel used to queue tasks for processing by the workers.
+	// Tasks are sent to this channel, and workers read from it to perform their work.
+	taskQueue chan worker.Task
+	// workers is a slice that holds the worker instances in the pool.
+	// Each worker is responsible for processing tasks from the taskQueue.
+	workers []worker.Worker
+	// maxWorkersCount defines the maximum number of workers that the pool can have.
+	// It sets the upper limit for the number of concurrent workers in the pool.
+	maxWorkersCount int32
+	// workerConcurrency tracks the number of currently running workers in the pool.
+	// It is an atomic integer to ensure safe concurrent access and updates.
+	workerConcurrency atomic.Int32
+	// maxRetryWorkerRestart specifies the maximum number of retry attempts for restarting a worker.
+	// It limits the number of recovery attempts in case a worker encounters issues.
+	maxRetryWorkerRestart int32
+	// workerWg is a WaitGroup used to synchronize the completion of worker tasks.
+	// It ensures that all worker goroutines complete their execution before shutting down the pool.
+	workerWg *sync.WaitGroup
+	// stopCh is a channel used to signal when the pool should stop.
+	// It allows for coordinated stopping of the pool's operations.
+	stopCh chan struct{}
+	// mutex is a synchronization primitive used to protect access to the pool's shared resources.
+	// It ensures that concurrent operations on the pool do not lead to data races.
+	mutex sync.Mutex
+	// onceStart ensures that the pool is started only once, even if multiple goroutines attempt to start it.
+	// It prevents redundant startup operations.
+	onceStart sync.Once
+	// onceStop ensures that the pool is stopped only once, even if multiple goroutines attempt to stop it.
+	// It prevents redundant shutdown operations.
+	onceStop sync.Once
+	// stopped is a flag indicating whether the pool has been stopped.
+	// It helps to determine if the pool is still active and if workers should be restarted.
+	stopped bool
+	// workerErrorCh is a channel used for reporting worker errors.
+	// It allows the pool to handle worker errors and attempt recovery if necessary.
+	workerErrorCh chan *worker.Error
+	// logger is used for logging messages related to the pool's operations.
+	// It provides visibility into the pool's state and activities.
+	logger *log.Logger
 }
 
+// NewWorkerPool creates a new instance of a worker pool with the specified options.
+// It initializes the pool, sets up the context, and prepares the pool for managing workers and tasks.
 func NewWorkerPool(options *worker.Options) *Pool {
+	// Create a logger to record messages related to the pool's operations.
+	// The logger writes to standard output with a prefix "pool:" and includes standard log flags.
 	logger := log.New(os.Stdout, "pool:", log.LstdFlags)
 
+	// Log the creation of a new worker pool.
 	logger.Print("new worker pool")
 
+	// Determine the concurrency level for the pool based on the provided options.
+	// If the WorkerCount is zero, default to twice the number of available CPU cores.
 	concurrency := options.WorkerCount
-
 	if concurrency == 0 {
 		concurrency = int32(runtime.NumCPU() * 2)
 	}
 
+	// Create a new context with cancel functionality for the pool.
+	// The context allows for canceling the pool's operations and handling timeouts.
 	ctx, cancel := context.WithCancel(options.Context)
 
+	// Return a new Pool instance with the initialized settings.
+	// This includes context, task queue, worker slice, concurrency settings, and logger.
 	return &Pool{
-		ctx:               ctx,
-		contextCancelFunc: cancel,
-		taskQueue:         options.Queue,
-		workers:           make([]worker.Worker, 0, options.WorkerCount),
-		maxWorkersCount:   concurrency,
-		stopCh:            make(chan struct{}, 1),
-		stopped:           false,
-		workerErrorCh:     make(chan *worker.Error),
-		workerWg:          new(sync.WaitGroup),
-		logger:            logger,
+		ctx:                   ctx,
+		contextCancelFunc:     cancel,
+		taskQueue:             options.Queue,
+		workers:               make([]worker.Worker, 0, options.WorkerCount),
+		maxWorkersCount:       concurrency,
+		maxRetryWorkerRestart: options.MaxRetryWorkerRestart,
+		stopCh:                make(chan struct{}, 1),
+		stopped:               false,
+		workerErrorCh:         make(chan *worker.Error),
+		workerWg:              new(sync.WaitGroup),
+		logger:                logger,
 	}
 }
 
@@ -70,43 +114,75 @@ func (p *Pool) Run() {
 	})
 }
 
+// loop is the main control loop of the worker pool. It continuously listens for control signals
+// and manages the lifecycle of workers in the pool, handling worker errors, pool shutdown, and task execution.
 func (p *Pool) loop() {
+	// This deferred function ensures that we can recover from any panic during the job execution
+	// and handle it gracefully by logging the error and performing necessary cleanup actions.
 	defer func() {
-		// Recover from any panic in the job and report it.
+		// Recover from any panic that might occur during the worker's execution.
+		// If a panic is recovered, it prevents the program from crashing.
 		if rec := recover(); rec != nil {
-			err := worker.GetRecoverError(rec)
-			if err != nil {
-				return
+			// Get the error from the worker based on the recovered panic value.
+			// This translates the panic into a worker-specific error.
+			if err := worker.GetRecoverError(rec); err != nil {
+				log.Printf("Worker pool encountered a error: %v", err)
 			}
 		}
 
-		p.workerWg.Done()
+		// Cancel the context associated with the worker pool to terminate any context-dependent operations.
 		p.contextCancelFunc()
+		// Stop the worker pool by invoking the Stop method.
+		// This ensures the pool is cleanly shut down once the current worker completes.
+		p.Stop()
+		// Signal that the worker has finished its job by decrementing the WaitGroup counter.
+		// This is important for synchronizing worker completion with the rest of the system.
+		p.workerWg.Done()
 	}()
 
+	// The loop continuously listens for control signals or errors that affect the worker pool's execution.
 	for {
 		select {
+		// Listen for the stop signal from the pool's stop channel.
+		// When this case is triggered, it indicates that the pool should be stopped.
 		case <-p.stopCh:
-			p.logger.Println("stop pool")
-			return
+			p.logger.Println("Stopping the worker pool...")
+		// Listen for the context's cancellation or timeout.
+		// When this case is triggered, it indicates that the context is done (canceled or timed out).
 		case <-p.ctx.Done():
+			// Check if the pool has not already been stopped.
+			// If not, proceed to stop the pool.
 			if !p.stopped {
 				p.logger.Println("stop pool")
-				// TODO: call Stop()
+				// Call the Stop method to stop the pool gracefully.
+				p.Stop()
 			}
 
-			// Exit the loop.
-			return
+		// Why we need this case: at some point the worker stopCh closed, a negative waitGroup was triggered,
+		// and there was a leak. It could happen that all the workers go down, and then the task or tasks,
+		// depending on which channel you're using, will just wait for someone to pick them up.
+		// Falling doesn't mean the end, falling means that we have to rebuild the worker and continue processing (as many times as it is allowed to avoid perpetual recovery problems).
 		case workerError, ok := <-p.workerErrorCh:
 			if !ok {
 				break
 			}
 
+			// Check if the worker pool has not been stopped and is still active.
+			// This ensures that we only attempt to restart workers if the pool is operational.
 			if !p.stopped {
-				p.workerWg.Add(1)
-				// it is safe to add waiting, because in case of panic triggering,
-				// the waitGroup counter will be decreased afterwards.
-				go workerError.Instance.Start(p.workerWg)
+				// Check if the worker's retry count is less than the maximum allowed retries.
+				// If the retry count is less than 'p.maxRetryWorkerRestart', the worker will be restarted.
+				if p.maxRetryWorkerRestart != workerError.Instance.GetRetry() {
+					// Increment the WaitGroup counter to account for the new worker goroutine.
+					// This ensures that the main routine waits for the worker restart process to complete.
+					p.workerWg.Add(1)
+
+					// Start a new goroutine to restart the worker.
+					// The worker restart process will be handled asynchronously.
+					go workerError.Instance.Restart(p.workerWg)
+				} else {
+					p.workerShutdown(workerError.Instance)
+				}
 			}
 		}
 	}
@@ -287,8 +363,11 @@ func (p *Pool) Stop() {
 	// This ensures that if something goes wrong, the panic is logged, and the shutdown continues.
 	defer func() {
 		if r := recover(); r != nil {
-			p.logger.Println("stop pool panic")
-			return
+			if err := worker.GetRecoverError(r); err != nil {
+				// Log the error using the standard Go logger.
+				// This ensures that any issues encountered during the shutdown process are recorded.
+				log.Printf("Error during worker pool stop: %v", err)
+			}
 		}
 	}()
 
@@ -335,13 +414,57 @@ func (p *Pool) Stop() {
 	return
 }
 
+// workerShutdown is responsible for shutting down a worker and removing it from the pool.
+// This method is particularly useful when a worker's recovery has failed, as it ensures
+// that the worker is stopped and removed, thereby freeing up resources.
+func (p *Pool) workerShutdown(wr worker.Worker) {
+	defer func() {
+		// Defer a function to recover from any panic that occurs during shutdown.
+		// If a panic is recovered, it attempts to log the error
+		if r := recover(); r != nil {
+			if err := worker.GetRecoverError(r); err != nil {
+				// Log the error using the standard Go logger.
+				// This ensures that any issues encountered during the shutdown process are recorded.
+				log.Printf("Error during worker shutdown: %v", err)
+			}
+		}
+	}()
+
+	// Lock the pool's mutex to ensure thread-safe operations during the worker shutdown.
+	p.mutex.Lock()
+
+	// Attempt to stop the worker. The result of Stop is ignored because the worker is
+	// being removed regardless of whether the stop operation succeeds.
+	_ = wr.Stop()
+	// Call the Exclude function from the worker package to remove the worker `wr`
+	// from the slice of workers (`p.workers`). The Exclude function returns a new
+	// slice (`res`) that contains all the original workers except `wr`.
+	// This operation is crucial when a worker has failed, and we need to ensure
+	// it is no longer part of the active worker pool.
+	res := worker.Exclude[worker.Worker](p.workers, wr)
+	// Update the `p.workers` slice by assigning it the new slice `res` that excludes
+	// the failed or stopped worker `wr`. This ensures that the internal state of
+	// the worker pool is accurate, reflecting the removal of the worker.
+	// After this assignment, the worker `wr` is no longer managed by the pool.
+	p.workers = res
+	// Decrement the pool's worker count to reflect that a worker has been removed.
+	p.decrementWorkerCount()
+
+	// Unlock the mutex to allow other operations on the pool to proceed.
+	p.mutex.Unlock()
+}
+
 // workersShutdown handles the shutdown process for all workers in the pool.
 // It ensures that each worker is properly stopped and decrements the worker count accordingly.
 // This method recovers from any panic that occurs during the shutdown to avoid crashing the program.
 func (p *Pool) workersShutdown() <-chan struct{} {
 	defer func() {
 		if r := recover(); r != nil {
-			return
+			if err := worker.GetRecoverError(r); err != nil {
+				// Log the error using the standard Go logger.
+				// This ensures that any issues encountered during the shutdown process are recorded.
+				log.Printf("Error during workers shutdown: %v", err)
+			}
 		}
 	}()
 
