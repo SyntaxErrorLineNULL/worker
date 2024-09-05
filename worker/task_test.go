@@ -170,7 +170,7 @@ func TestTask(t *testing.T) {
 		// Optionally, you could add an assertion to check the specific
 		// error message returned to ensure it matches expected error messages.
 		// This is useful if you want to validate the exact reason for the failure.
-		assert.Equal(t, "cannot set a closed channel", err.Error(), "unexpected error message")
+		assert.Equal(t, "chan is close", err.Error(), "unexpected error message")
 	})
 
 	// SetContext tests the SetContext method of the Task struct to ensure
