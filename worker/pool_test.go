@@ -2,11 +2,10 @@ package worker
 
 import (
 	"context"
-	"testing"
-
 	"github.com/SyntaxErrorLineNULL/worker"
 	"github.com/SyntaxErrorLineNULL/worker/mocks"
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestPool(t *testing.T) {
@@ -238,7 +237,7 @@ func TestPool(t *testing.T) {
 
 		// Create a channel for job submission.
 		// Jobs will be sent to this channel for processing by the worker pool.
-		task := make(chan worker.Task, 10)
+		task := make(chan worker.Task, 1)
 
 		// Initialize a new worker pool with the given parameters.
 		// This sets up the pool with the provided context, task queue, and worker count.
@@ -268,5 +267,45 @@ func TestPool(t *testing.T) {
 		// Assert that the task was added to the collector channel by checking the length of the collector channel.
 		// The length should be 1, indicating that the job is correctly queued in the pool.
 		assert.Equal(t, 1, len(pool.taskQueue), "The queue channel should contain exactly one task")
+	})
+
+	// WorkerLimitReached tests the behavior of the worker pool when attempting to add
+	// more workers than the maximum limit allowed by the pool. It verifies that the
+	// pool enforces the worker limit correctly by allowing only up to the maximum
+	// number of workers and rejecting any additional workers beyond this limit.
+	t.Run("WorkerLimitReached", func(t *testing.T) {
+		// Define the number of workers to be used in the worker pool.
+		// This value determines how many worker goroutines will be created.
+		workerCount := int32(1)
+
+		// Create a parent context for the worker pool.
+		// The context is used to control the lifetime of the worker pool.
+		parentCtx := context.Background()
+
+		// Create a channel for job submission.
+		// Jobs will be sent to this channel for processing by the worker pool.
+		task := make(chan worker.Task, 1)
+
+		// Initialize a new worker pool with the given parameters.
+		// This sets up the pool with the provided context, task queue, and worker count.
+		// It prepares the pool to manage and distribute tasks to the workers.
+		pool := NewWorkerPool(&worker.Options{Context: parentCtx, Queue: task, WorkerCount: workerCount})
+
+		// Assert that initially, no workers should be running.
+		// This confirms that the pool starts in an idle state with zero active workers.
+		// Ensures that the worker pool initialization is correct before adding any workers.
+		assert.Equal(t, int32(0), pool.RunningWorkers(), "Initially, no workers should be running")
+
+		// Add the first worker to the worker pool.
+		// This should succeed since the pool's limit is 1 and currently no workers are running.
+		err := pool.AddWorker(NewWorker("1"))
+		// Check that adding the first worker does not produce an error.
+		assert.NoError(t, err, "Adding the first worker should not produce an error")
+
+		// Attempt to add a second worker to the worker pool.
+		// Since the pool's limit is 1, adding another worker should fail.
+		err = pool.AddWorker(NewWorker("2"))
+		// Assert that an error occurred when trying to add the second worker.
+		assert.Error(t, err, "Adding a second worker should produce an error as the worker limit is reached")
 	})
 }
