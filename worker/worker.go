@@ -13,7 +13,7 @@ import (
 // Worker represents a worker in a task processing pool.
 // It holds all necessary information and channels to process tasks, manage its state, and handle errors.
 type Worker struct {
-	workerID       int64              // Unique identifier for the worker.
+	workerName     string             // Unique identifier for the worker.
 	workerContext  context.Context    // Context for the worker's operations.
 	mutex          sync.RWMutex       // Mutex to control access to shared resources.
 	stopCh         chan struct{}      // Channel to signal the worker to stop processing tasks.
@@ -26,19 +26,29 @@ type Worker struct {
 	logger         *log.Logger
 }
 
-// NewWorker initializes a new Worker instance with the provided workerID.
+// NewWorker initializes a new Worker instance with the provided workerName.
 // It sets up necessary channels and a logger for the worker, and returns a pointer to the Worker.
-func NewWorker(workerID int64) *Worker {
+func NewWorker(workerName string) *Worker {
 	logger := log.New(os.Stdout, "pool:", log.LstdFlags)
 
 	logger.Print("new worker pool")
 
 	return &Worker{
-		workerID: workerID,
-		stopCh:   make(chan struct{}, 1),
-		errCh:    make(chan *worker.Error),
-		logger:   logger,
+		workerName: workerName,
+		stopCh:     make(chan struct{}, 1),
+		errCh:      make(chan *worker.Error),
+		logger:     logger,
 	}
+}
+
+// String returns the name of the worker as its string representation.
+// This method allows the Worker instance to be represented as a string, which is useful
+// for logging, debugging, or any other context where the worker's name is needed in text format.
+func (w *Worker) String() string {
+	// Return the worker's name, which is stored in the workerName field.
+	// This ensures that the String method provides a meaningful and identifiable
+	// representation of the Worker instance.
+	return w.workerName
 }
 
 // SetContext sets the context for the worker. This method is used to provide
@@ -135,7 +145,7 @@ func (w *Worker) Start(wg *sync.WaitGroup) {
 		// This case handles the situation where the worker receives a signal from its stop channel.
 		// The stop channel stopCh is used to signal that the worker should stop its execution.
 		case <-w.stopCh:
-			w.logger.Printf("stop channel workerID: %d", w.workerID)
+			w.logger.Printf("stop channel workerName: %d", w.workerName)
 			// Exit the loop, effectively stopping the worker's execution.
 			// This happens when the stop channel is triggered, signaling that the worker should terminate.
 			return
@@ -193,7 +203,7 @@ func (w *Worker) Start(wg *sync.WaitGroup) {
 				w.setStatus(worker.StatusWorkerIdle)
 			} else {
 				// If the task queue channel is closed
-				w.logger.Printf("job collector is close: workerID: %d, workerStatus: %d", w.workerContext, w.status)
+				w.logger.Printf("job collector is close: workerName: %d, workerStatus: %d", w.workerContext, w.status)
 				// Call the worker's `Stop` method to clean up and stop the worker.
 				// This method sets the worker status to stopped and performs necessary cleanup.
 				w.Stop()
