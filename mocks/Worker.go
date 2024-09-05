@@ -366,6 +366,51 @@ func (_c *Worker_Stop_Call) RunAndReturn(run func() <-chan struct{}) *Worker_Sto
 	return _c
 }
 
+// String provides a mock function with given fields:
+func (_m *Worker) String() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for String")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// Worker_String_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'String'
+type Worker_String_Call struct {
+	*mock.Call
+}
+
+// String is a helper method to define mock.On call
+func (_e *Worker_Expecter) String() *Worker_String_Call {
+	return &Worker_String_Call{Call: _e.mock.On("String")}
+}
+
+func (_c *Worker_String_Call) Run(run func()) *Worker_String_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Worker_String_Call) Return(_a0 string) *Worker_String_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Worker_String_Call) RunAndReturn(run func() string) *Worker_String_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewWorker creates a new instance of Worker. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewWorker(t interface {
