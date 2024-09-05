@@ -126,4 +126,46 @@ func TestPool(t *testing.T) {
 		// This checks that the remaining workers are correctly ordered in the pool after removing the last worker.
 		assert.Equal(t, secondMockWorker, pool.workers[1], "Expected the second worker in the pool to be secondMockWorker")
 	})
+
+	// AddWorkerWithNilWorker tests the behavior of the AddWorker method when
+	// attempting to add a nil worker to the worker pool. This test ensures that
+	// the method correctly identifies and handles invalid input. Specifically,
+	// it checks whether the pool returns the appropriate error when a nil
+	// worker is provided, and verifies that no changes occur in the pool state.
+	t.Run("AddWorkerWithNilWorker", func(t *testing.T) {
+		// Define the number of workers to be used in the worker pool.
+		// This value determines how many worker goroutines will be created.
+		workerCount := int32(1)
+
+		// Create a parent context for the worker pool.
+		// The context is used to control the lifetime of the worker pool.
+		parentCtx := context.Background()
+
+		// Create a channel for job submission.
+		// Jobs will be sent to this channel for processing by the worker pool.
+		task := make(chan worker.Task)
+
+		// Initialize a new worker pool with the given parameters.
+		// This sets up the pool with the provided context, task queue, and worker count.
+		// It prepares the pool to manage and distribute tasks to the workers.
+		pool := NewWorkerPool(&worker.Options{Context: parentCtx, Queue: task, WorkerCount: workerCount})
+
+		// Assert that initially, no workers should be running.
+		// This confirms that the pool starts in an idle state with zero active workers.
+		// Ensures that the worker pool initialization is correct before adding any workers.
+		assert.Equal(t, int32(0), pool.RunningWorkers(), "Initially, no workers should be running")
+
+		// Attempt to add a nil worker to the pool.
+		// This tests the pool's handling of invalid input. Adding a nil worker is not
+		// allowed, and the pool should properly reject it and return an error.
+		err := pool.AddWorker(nil)
+
+		// Assert that an error is returned when trying to add a nil worker.
+		// This ensures that the pool correctly handles invalid input by returning an appropriate error.
+		assert.Error(t, err, "Expected error when adding a nil worker, but no error was returned")
+
+		// Assert that the error returned is specifically of type WorkerIsNilError.
+		// This checks that the error type matches the expected error for adding a nil worker.
+		assert.ErrorIs(t, err, worker.WorkerIsNilError, "The error returned when adding a nil worker was not of type WorkerIsNilError")
+	})
 }
