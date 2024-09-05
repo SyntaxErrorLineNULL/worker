@@ -2,15 +2,26 @@ package worker
 
 import (
 	"context"
-	"github.com/SyntaxErrorLineNULL/worker/mocks"
 	"testing"
 
 	"github.com/SyntaxErrorLineNULL/worker"
+	"github.com/SyntaxErrorLineNULL/worker/mocks"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestPool(t *testing.T) {
 	t.Parallel()
+
+	// Create a new mock task instance using the mocks package.
+	// The mock task is created for use in testing, providing a controlled and
+	// predictable task object that can be configured to simulate various behaviors.
+	// This is essential for verifying that the worker pool handles tasks as expected.
+	mockTask := mocks.NewTask(t)
+	// Assert that the mock task instance is not nil.
+	// This ensures that the mock task was successfully created and initialized.
+	// If the task were nil, it would indicate a failure in the mock setup, which
+	// could lead to incorrect test results or an inability to run the test as intended.
+	assert.NotNil(t, mockTask, "Mock task should not be nil")
 
 	// InitWorkerPool tests the initialization of a worker pool with a specified number of workers
 	// It ensures that the worker pool is correctly set up with the right worker count, parent context, and logger,
@@ -210,5 +221,52 @@ func TestPool(t *testing.T) {
 		// This verifies that the pool returns the correct error type, indicating that
 		// the pool is stopped and cannot accept new workers.
 		assert.ErrorIs(t, err, worker.WorkerPoolStopError, "The error returned when adding a worker to a stopped pool was not of type WorkerPoolStopError")
+	})
+
+	// SuccessfullyAddsTask tests the behavior of the `AddTaskInQueue` method
+	// when adding a task to the worker pool. It ensures that the task is
+	// correctly added to the task queue and that no errors occur during
+	// the addition process.
+	t.Run("SuccessfullyAddsTask", func(t *testing.T) {
+		// Define the number of workers to be used in the worker pool.
+		// This value determines how many worker goroutines will be created.
+		workerCount := int32(1)
+
+		// Create a parent context for the worker pool.
+		// The context is used to control the lifetime of the worker pool.
+		parentCtx := context.Background()
+
+		// Create a channel for job submission.
+		// Jobs will be sent to this channel for processing by the worker pool.
+		task := make(chan worker.Task, 10)
+
+		// Initialize a new worker pool with the given parameters.
+		// This sets up the pool with the provided context, task queue, and worker count.
+		// It prepares the pool to manage and distribute tasks to the workers.
+		pool := NewWorkerPool(&worker.Options{Context: parentCtx, Queue: task, WorkerCount: workerCount})
+
+		// Assert that initially, no workers should be running.
+		// This confirms that the pool starts in an idle state with zero active workers.
+		// Ensures that the worker pool initialization is correct before adding any workers.
+		assert.Equal(t, int32(0), pool.RunningWorkers(), "Initially, no workers should be running")
+
+		// Expectation setup for mock task.
+		// Mock task's SetContext method is expected to be called with the pool's context
+		// and should return nil. This setup is necessary to simulate the behavior of
+		// adding a task in the worker pool.
+		mockTask.EXPECT().SetContext(pool.ctx).Return(nil).Once()
+
+		// AddTaskInQueue adds a task to the worker pool's task queue.
+		// This method call should enqueue the task and return an error if something goes wrong.
+		// The task should be successfully added to the queue, as verified by the assertion below.
+		err := pool.AddTaskInQueue(mockTask)
+		// Assert that adding the task to the queue did not result in an error.
+		// The assertion ensures that no error was returned during the operation,
+		// which indicates that the task was successfully enqueued in the worker pool.
+		assert.NoError(t, err, "Adding task to queue should not return an error")
+
+		// Assert that the task was added to the collector channel by checking the length of the collector channel.
+		// The length should be 1, indicating that the job is correctly queued in the pool.
+		assert.Equal(t, 1, len(pool.taskQueue), "The queue channel should contain exactly one task")
 	})
 }
