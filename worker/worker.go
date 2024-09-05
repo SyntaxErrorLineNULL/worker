@@ -124,8 +124,7 @@ func (w *Worker) Start(wg *sync.WaitGroup) {
 		// Attempt to recover from a panic and retrieve the error.
 		if rec := recover(); rec != nil {
 			// Convert the recovered value to an error.
-			err := worker.GetRecoverError(rec)
-			if err != nil {
+			if err := worker.GetRecoverError(rec); err != nil {
 				// Send the error to the worker's error channel for external handling.
 				w.errCh <- &worker.Error{Error: err, Instance: w}
 			}
@@ -145,7 +144,7 @@ func (w *Worker) Start(wg *sync.WaitGroup) {
 		// This case handles the situation where the worker receives a signal from its stop channel.
 		// The stop channel stopCh is used to signal that the worker should stop its execution.
 		case <-w.stopCh:
-			w.logger.Printf("stop channel workerName: %d", w.workerName)
+			w.logger.Printf("stop channel workerName: %s", w.workerName)
 			// Exit the loop, effectively stopping the worker's execution.
 			// This happens when the stop channel is triggered, signaling that the worker should terminate.
 			return
@@ -203,7 +202,7 @@ func (w *Worker) Start(wg *sync.WaitGroup) {
 				w.setStatus(worker.StatusWorkerIdle)
 			} else {
 				// If the task queue channel is closed
-				w.logger.Printf("job collector is close: workerName: %d, workerStatus: %d", w.workerContext, w.status)
+				w.logger.Printf("job collector is close: workerName: %s, workerStatus: %d", w.workerName, w.status)
 				// Call the worker's `Stop` method to clean up and stop the worker.
 				// This method sets the worker status to stopped and performs necessary cleanup.
 				w.Stop()
