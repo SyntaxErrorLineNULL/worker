@@ -168,4 +168,47 @@ func TestPool(t *testing.T) {
 		// This checks that the error type matches the expected error for adding a nil worker.
 		assert.ErrorIs(t, err, worker.WorkerIsNilError, "The error returned when adding a nil worker was not of type WorkerIsNilError")
 	})
+
+	// AddWorkerWithStoppedPool tests the behavior of the AddWorker method when
+	// attempting to add a worker to a pool that has already been stopped. This test
+	// ensures that the pool correctly handles the scenario where worker addition is
+	// attempted after the pool has been stopped. It verifies that the pool returns
+	// the appropriate error, reflecting its stopped state and preventing any changes
+	// to the pool’s worker list.
+	t.Run("AddWorkerWithStoppedPool", func(t *testing.T) {
+		// Define the number of workers to be used in the worker pool.
+		// This value determines how many worker goroutines will be created.
+		workerCount := int32(1)
+
+		// Create a parent context for the worker pool.
+		// The context is used to control the lifetime of the worker pool.
+		parentCtx := context.Background()
+
+		// Create a channel for job submission.
+		// Jobs will be sent to this channel for processing by the worker pool.
+		task := make(chan worker.Task)
+
+		// Initialize a new worker pool with the given parameters.
+		// The pool is set up with the provided context, task queue, and worker count.
+		// This prepares the pool for task processing with the specified number of workers.
+		pool := NewWorkerPool(&worker.Options{Context: parentCtx, Queue: task, WorkerCount: workerCount})
+
+		// Manually set the pool's stopped flag to true.
+		// This simulates the condition where the pool has been stopped and is no longer
+		// accepting new workers. This setup is necessary to test the pool's behavior
+		// when in a stopped state.
+		pool.stopped = true
+
+		// Attempt to add a nil worker to the stopped pool.
+		// This tests how the pool handles worker addition when it is in a stopped state.
+		err := pool.AddWorker(nil)
+		// Assert that an error is returned when attempting to add a worker to a stopped pool.
+		// This confirms that the pool correctly identifies its stopped state and prevents
+		// further modifications to its worker list.
+		assert.Error(t, err, "Expected error when adding a worker to a stopped pool, but no error was returned")
+		// Assert that the error returned is specifically of type WorkerPoolStopError.
+		// This verifies that the pool returns the correct error type, indicating that
+		// the pool is stopped and cannot accept new workers.
+		assert.ErrorIs(t, err, worker.WorkerPoolStopError, "The error returned when adding a worker to a stopped pool was not of type WorkerPoolStopError")
+	})
 }
