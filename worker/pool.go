@@ -225,6 +225,11 @@ func (p *Pool) AddTaskInQueue(task worker.Task) (err error) {
 		// The default case allows the program to move on to adding the task to the queue.
 	}
 
+	if err = task.SetContext(p.ctx); err != nil {
+		// TODO: add logger
+		return err
+	}
+
 	// Add the provided task to the taskQueue for processing.
 	// This operation is non-blocking and will place the task in the queue to be picked up by a worker.
 	p.taskQueue <- task
