@@ -36,7 +36,6 @@ func NewWorker(workerName string) *Worker {
 	return &Worker{
 		workerName: workerName,
 		stopCh:     make(chan struct{}, 1),
-		errCh:      make(chan *worker.Error),
 		logger:     logger,
 	}
 }
@@ -267,8 +266,7 @@ func (w *Worker) Stop() <-chan struct{} {
 		// Attempt to recover from a panic and retrieve the error.
 		if rec := recover(); rec != nil {
 			// Convert the recovered value to an error.
-			err := worker.GetRecoverError(rec)
-			if err != nil {
+			if err := worker.GetRecoverError(rec); err != nil {
 				// This is in case something caused a panic, but the worker status was not set to worker.StatusWorkerStopped,
 				// so that the Worker pool would not recover the worker.
 				if w.GetStatus() != worker.StatusWorkerStopped {
@@ -307,9 +305,6 @@ func (w *Worker) Stop() <-chan struct{} {
 		w.stopCh <- struct{}{}
 		// Close the stop channel to indicate that no more stop signals will be sent.
 		close(w.stopCh)
-
-		// Close the error channel to indicate that no more errors will be sent.
-		close(w.errCh)
 	})
 
 	// Return the channel to allow external monitoring of completion.
