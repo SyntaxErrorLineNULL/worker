@@ -31,6 +31,13 @@ type Worker interface {
 	// Otherwise all the workers will simply be stopped and stop working.
 	SetQueue(queue chan Task) error
 
+	// SetWorkerErrChannel assigns an error channel to the worker.
+	// This channel is used to report serious errors or panics that occur
+	// during task processing. The pool listens to this channel to detect
+	// when a worker encounters a severe issue and needs to be restarted.
+	// Returns an error if the channel is closed at the time of assignment.
+	SetWorkerErrChannel(errCh chan *Error) error
+
 	// Restart attempts to restart the worker by incrementing the retry count
 	// and then invoking the Start method to resume the worker's operation.
 	// This method is used to recover a worker that may have encountered an issue,
