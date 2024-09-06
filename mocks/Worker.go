@@ -286,6 +286,52 @@ func (_c *Worker_SetQueue_Call) RunAndReturn(run func(chan worker.Task) error) *
 	return _c
 }
 
+// SetWorkerErrChannel provides a mock function with given fields: errCh
+func (_m *Worker) SetWorkerErrChannel(errCh chan *worker.Error) error {
+	ret := _m.Called(errCh)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetWorkerErrChannel")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(chan *worker.Error) error); ok {
+		r0 = rf(errCh)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Worker_SetWorkerErrChannel_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetWorkerErrChannel'
+type Worker_SetWorkerErrChannel_Call struct {
+	*mock.Call
+}
+
+// SetWorkerErrChannel is a helper method to define mock.On call
+//   - errCh chan *worker.Error
+func (_e *Worker_Expecter) SetWorkerErrChannel(errCh interface{}) *Worker_SetWorkerErrChannel_Call {
+	return &Worker_SetWorkerErrChannel_Call{Call: _e.mock.On("SetWorkerErrChannel", errCh)}
+}
+
+func (_c *Worker_SetWorkerErrChannel_Call) Run(run func(errCh chan *worker.Error)) *Worker_SetWorkerErrChannel_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(chan *worker.Error))
+	})
+	return _c
+}
+
+func (_c *Worker_SetWorkerErrChannel_Call) Return(_a0 error) *Worker_SetWorkerErrChannel_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Worker_SetWorkerErrChannel_Call) RunAndReturn(run func(chan *worker.Error) error) *Worker_SetWorkerErrChannel_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Start provides a mock function with given fields: wg
 func (_m *Worker) Start(wg *sync.WaitGroup) {
 	_m.Called(wg)
