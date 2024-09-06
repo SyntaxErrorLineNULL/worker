@@ -96,6 +96,32 @@ func (w *Worker) SetQueue(queue chan worker.Task) error {
 	return nil
 }
 
+// SetWorkerErrChannel assigns the provided error channel to the worker for reporting
+// serious panic errors that occur during its operation. This channel is used to notify
+// the worker pool of such errors, so the pool can take appropriate action, such as
+// restarting the worker.
+func (w *Worker) SetWorkerErrChannel(errCh chan *worker.Error) error {
+	// Use a select statement with a default case to check if the provided channel is closed.
+	// The select statement attempts to receive from the queue channel.
+	select {
+	// Attempt to receive from the queue channel.
+	case _, ok := <-errCh:
+		// If the receive operation fails, the channel is closed.
+		// Return an error indicating that the channel is closed.
+		if !ok {
+			return worker.ChanIsCloseError
+		}
+	// If the receive operation would block, continue without doing anything.
+	default:
+	}
+
+	// Set the error channel to the provided queue channel.
+	w.errCh = errCh
+
+	// Return nil indicating that the operation was successful.
+	return nil
+}
+
 // Restart attempts to restart the worker by incrementing the retry count
 // and then invoking the Start method to resume the worker's operation.
 // The retry count is incremented to track the number of recovery attempts.
@@ -248,14 +274,8 @@ func (w *Worker) Stop() <-chan struct{} {
 				if w.GetStatus() != worker.StatusWorkerStopped {
 					w.setStatus(worker.StatusWorkerStopped)
 				}
-
-				// Send the error to the worker's error channel for external handling.
-				w.errCh <- &worker.Error{Error: err, Instance: w}
 			}
 		}
-
-		// Close the error channel to indicate that no more errors will be sent.
-		close(w.errCh)
 	}()
 
 	// Create a channel to signal when the worker has stopped.
@@ -287,6 +307,9 @@ func (w *Worker) Stop() <-chan struct{} {
 		w.stopCh <- struct{}{}
 		// Close the stop channel to indicate that no more stop signals will be sent.
 		close(w.stopCh)
+
+		// Close the error channel to indicate that no more errors will be sent.
+		close(w.errCh)
 	})
 
 	// Return the channel to allow external monitoring of completion.
