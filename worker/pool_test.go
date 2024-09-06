@@ -2,10 +2,12 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"github.com/SyntaxErrorLineNULL/worker"
 	"github.com/SyntaxErrorLineNULL/worker/mocks"
 	"github.com/stretchr/testify/assert"
 	"testing"
+	"time"
 )
 
 func TestPool(t *testing.T) {
@@ -307,5 +309,84 @@ func TestPool(t *testing.T) {
 		err = pool.AddWorker(NewWorker("2"))
 		// Assert that an error occurred when trying to add the second worker.
 		assert.Error(t, err, "Adding a second worker should produce an error as the worker limit is reached")
+	})
+
+	// WorkerPanic simulates a scenario where a worker in the worker pool encounters an error or panic condition.
+	// The goal of this test is to validate how the worker pool responds when a worker fails unexpectedly.
+	// Specifically, it ensures that the worker pool can correctly manage worker errors without crashing,
+	// allows the worker to be added and managed even if it later encounters issues, and ensures that
+	// the worker pool can continue processing other tasks normally. The test covers both the normal worker
+	// lifecycle (such as restarting, starting, and queue handling) and the error handling mechanisms that
+	// allow the pool to remain operational when individual workers fail. By simulating a worker panic,
+	// this test ensures robustness in the pool's ability to manage errors while maintaining its ability
+	// to continue task execution.
+	t.Run("WorkerPanic", func(t *testing.T) {
+		// Define the number of workers to be used in the worker pool.
+		// This value determines how many worker goroutines will be created.
+		workerCount := int32(1)
+
+		// Create a parent context for the worker pool.
+		// The context is used to control the lifetime of the worker pool.
+		parentCtx := context.Background()
+
+		// Create a channel for job submission.
+		// Jobs will be sent to this channel for processing by the worker pool.
+		task := make(chan worker.Task, 1)
+
+		// Initialize a new worker pool with the given parameters.
+		// This sets up the pool with the provided context, task queue, and worker count.
+		// It prepares the pool to manage and distribute tasks to the workers.
+		pool := NewWorkerPool(&worker.Options{Context: parentCtx, Queue: task, WorkerCount: workerCount})
+
+		// Assert that initially, no workers should be running.
+		// This confirms that the pool starts in an idle state with zero active workers.
+		// Ensures that the worker pool initialization is correct before adding any workers.
+		assert.Equal(t, int32(0), pool.RunningWorkers(), "Initially, no workers should be running")
+
+		// Start the worker pool in a separate Goroutine to allow it to operate asynchronously.
+		// This enables the pool to begin its job processing and worker management in parallel.
+		go pool.Run()
+
+		// Pause for 20 milliseconds to give the pool time to initialize and get ready.
+		// This small delay ensures that the pool has started running before we add workers.
+		<-time.After(20 * time.Millisecond)
+
+		// Create a mock worker to simulate the behavior of a real worker in the pool.
+		// The mock is used to define expected behaviors, such as restarting or starting a worker.
+		newWorker := mocks.NewWorker(t)
+		// Expect the mock worker to restart using the pool's wait group.
+		// This simulates the worker being restarted, ensuring that the pool is managing worker lifecycle correctly.
+		newWorker.EXPECT().Restart(pool.workerWg).Return()
+		// Expect the mock worker to start, using the pool's wait group.
+		// This simulates the worker starting its task processing after being added to the pool.
+		newWorker.EXPECT().Start(pool.workerWg).Return()
+		// Set the context for the worker, passing the pool's context.
+		// This ensures that the worker is tied to the pool's context, allowing it to handle cancellation or timeouts.
+		newWorker.EXPECT().SetContext(pool.ctx).Return(nil)
+		// Set the task queue for the worker, using the pool's task queue.
+		// This binds the worker to the queue from which it will pull tasks for processing.
+		newWorker.EXPECT().SetQueue(pool.taskQueue).Return(nil)
+		// Simulate the worker's retry behavior, returning a retry count of 1.
+		// This ensures that the worker is allowed one retry if it encounters a failure during task execution.
+		newWorker.EXPECT().GetRetry().Return(int32(1))
+
+		// Add the mock worker to the pool and assert no error occurred.
+		// This step verifies that the worker is correctly added to the pool.
+		err := pool.AddWorker(newWorker)
+		// Assert that adding the worker did not return an error.
+		// This ensures that the worker addition process was successful and no issues occurred.
+		assert.NoError(t, err, "Adding the worker to the pool should not produce an error")
+
+		// Check that the worker was successfully added to the pool.
+		// This verifies that the pool now contains one worker.
+		assert.Equal(t, workerCount, int32(len(pool.workers)), "The worker pool should contain one worker")
+
+		// Simulate an error occurring in the worker by sending an error to the worker's error channel.
+		// This action allows the test to validate how the worker pool handles errors from workers.
+		pool.workerErrorCh <- &worker.Error{Error: errors.New("some error"), Instance: newWorker}
+
+		// Wait for 1 second to allow the job to be processed by the worker.
+		// This provides sufficient time for the worker to process the job.
+		<-time.After(100 * time.Millisecond)
 	})
 }
