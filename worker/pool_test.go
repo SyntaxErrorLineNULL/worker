@@ -476,10 +476,6 @@ func TestPool(t *testing.T) {
 			pool.Stop()
 		}()
 
-		// Pause for 200 milliseconds to allow the pool stop operation to be initiated.
-		// This small delay gives the pool sufficient time to begin stopping workers before proceeding with assertions.
-		<-time.After(500 * time.Millisecond)
-
 		// Wait for the pool to stop or timeout.
 		// Check if the worker pool has stopped and no workers are running.
 		select {
