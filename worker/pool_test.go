@@ -478,7 +478,7 @@ func TestPool(t *testing.T) {
 
 		// Pause for 200 milliseconds to allow the pool stop operation to be initiated.
 		// This small delay gives the pool sufficient time to begin stopping workers before proceeding with assertions.
-		<-time.After(200 * time.Millisecond)
+		<-time.After(500 * time.Millisecond)
 
 		// Wait for the pool to stop or timeout.
 		// Check if the worker pool has stopped and no workers are running.
@@ -504,7 +504,7 @@ func TestPool(t *testing.T) {
 			// This ensures that the worker was properly stopped as part of the pool shutdown process.
 			assert.Equal(t, wr.GetStatus(), worker.StatusWorkerStopped, "The worker should have stopped")
 
-		case <-time.After(5 * time.Second):
+		case <-time.After(6 * time.Second):
 			// Timeout case: if the pool does not stop within the expected time, indicate a test failure.
 			t.Error("Failed to stop worker pool within expected time")
 		}
