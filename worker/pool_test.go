@@ -369,6 +369,10 @@ func TestPool(t *testing.T) {
 		// Simulate the worker's retry behavior, returning a retry count of 1.
 		// This ensures that the worker is allowed one retry if it encounters a failure during task execution.
 		newWorker.EXPECT().GetRetry().Return(int32(1))
+		// Set up the expected behavior for the worker's SetWorkerErrChannel method.
+		// This expectation specifies that when the SetWorkerErrChannel method is called on the
+		// newWorker mock, it should be provided with the workerErrorCh channel from the pool.
+		newWorker.EXPECT().SetWorkerErrChannel(pool.workerErrorCh).Return(nil)
 
 		// Add the mock worker to the pool and assert no error occurred.
 		// This step verifies that the worker is correctly added to the pool.
@@ -488,6 +492,103 @@ func TestPool(t *testing.T) {
 			// The test will fail if `pool.stopped` is not `true`, indicating a potential issue
 			// with the pool's stopping mechanism.
 			assert.True(t, pool.stopped)
+
+			// Check that the worker's status is set to `StatusWorkerStopped` after stopping.
+			// This ensures that the worker was properly stopped as part of the pool shutdown process.
+			assert.Equal(t, wr.GetStatus(), worker.StatusWorkerStopped, "The worker should have stopped")
+
+		case <-time.After(5 * time.Second):
+			// Timeout case: if the pool does not stop within the expected time, indicate a test failure.
+			t.Error("Failed to stop worker pool within expected time")
+		}
+	})
+
+	// ContextDone tests the behavior of the worker pool when the parent context is canceled.
+	// It verifies that the pool correctly stops all running workers, cleans up resources,
+	// and updates its internal state to reflect that it has been stopped. This test ensures
+	// proper shutdown of the pool and confirms that all workers are terminated as expected.
+	t.Run("ContextDone", func(t *testing.T) {
+		// Create a context with cancellation capabilities.
+		// This context will be used to control the worker’s execution lifecycle,
+		// allowing us to signal the worker to stop.
+		ctx, cancel := context.WithCancel(context.Background())
+
+		// Define the number of workers to be used in the worker pool.
+		// This value determines how many worker goroutines will be created.
+		workerCount := int32(1)
+
+		// Create a channel for job submission.
+		// Jobs will be sent to this channel for processing by the worker pool.
+		task := make(chan worker.Task, 1)
+
+		// Initialize a new worker pool with the given parameters.
+		// This sets up the pool with the provided context, task queue, and worker count.
+		// It prepares the pool to manage and distribute tasks to the workers.
+		pool := NewWorkerPool(&worker.Options{Context: ctx, Queue: task, WorkerCount: workerCount})
+
+		// Assert that initially, no workers should be running.
+		// This confirms that the pool starts in an idle state with zero active workers.
+		// Ensures that the worker pool initialization is correct before adding any workers.
+		assert.Equal(t, int32(0), pool.RunningWorkers(), "Initially, no workers should be running")
+
+		// Start the worker pool in a separate Goroutine to allow it to operate asynchronously.
+		// This enables the pool to begin its job processing and worker management in parallel.
+		go pool.Run()
+
+		// Pause for 20 milliseconds to give the pool time to initialize and get ready.
+		// This small delay ensures that the pool has started running before we add workers.
+		<-time.After(20 * time.Millisecond)
+
+		newWorker := NewWorker("test-stop-worker")
+		// Add the new worker to the pool and assert no error occurred.
+		// This step verifies that the worker is correctly added to the pool.
+		err := pool.AddWorker(newWorker)
+		// Assert that adding the worker did not return an error.
+		// This ensures that the worker addition process was successful and no issues occurred.
+		assert.NoError(t, err, "Adding the worker to the pool should not produce an error")
+
+		// Assert that the number of running workers is equal to 1.
+		// This ensures that the worker pool has exactly one worker running after adding the worker.
+		assert.Equal(t, workerCount, pool.RunningWorkers(), "There should be exactly 1 worker running after adding the worker")
+
+		// Retrieve the first worker instance from the pool's workers slice.
+		// This step assumes that a worker has already been added to the pool.
+		wr := pool.workers[0]
+
+		// Ensure the retrieved worker instance is not nil.
+		// This assertion checks that the worker was successfully created and added to the pool.
+		// If the worker is nil, it indicates an issue with the worker creation or addition process.
+		assert.NotNil(t, wr, "The worker instance should be successfully created")
+
+		// Assert that the worker's current status is equal to StatusWorkerIdle.
+		// This check ensures that the worker is in the expected idle state,
+		// indicating that it is not currently processing any jobs and is ready
+		// to take on new tasks.
+		assert.Equal(t, worker.StatusWorkerIdle, wr.GetStatus())
+
+		// Cancel the context to signal the pool to stop.
+		cancel()
+
+		// Wait for a short duration to allow the stop signal to propagate.
+		<-time.After(100 * time.Millisecond)
+
+		// Wait for the pool to stop or timeout.
+		// Check if the worker pool has stopped and no workers are running.
+		select {
+		case <-pool.stopCh:
+			// Check if the number of running workers is zero after stopping the pool.
+			// This confirms that all workers have stopped as expected.
+			assert.Equal(t, int32(0), pool.RunningWorkers(), "All workers should have stopped")
+
+			// Check that the worker pool no longer contains any workers.
+			// This verifies that the worker pool has been completely emptied after stopping.
+			assert.Equal(t, 0, len(pool.workers), "The worker pool should be empty")
+
+			// Verify that the worker pool has stopped.
+			// The `pool.stopped` flag should be set to `true` if the pool was successfully
+			// stopped as part of the test. This assertion ensures that the pool's stop logic
+			// was executed correctly and that all worker goroutines were properly terminated.
+			assert.True(t, pool.stopped, "Expected pool to be stopped")
 
 			// Check that the worker's status is set to `StatusWorkerStopped` after stopping.
 			// This ensures that the worker was properly stopped as part of the pool shutdown process.

@@ -89,12 +89,12 @@ func NewWorkerPool(options *worker.Options) *Pool {
 		ctx:                   ctx,
 		contextCancelFunc:     cancel,
 		taskQueue:             options.Queue,
-		workers:               make([]worker.Worker, 0, options.WorkerCount),
+		workers:               make([]worker.Worker, 0, concurrency),
 		maxWorkersCount:       concurrency,
 		maxRetryWorkerRestart: options.MaxRetryWorkerRestart,
 		stopCh:                make(chan struct{}, 1),
 		stopped:               false,
-		workerErrorCh:         make(chan *worker.Error),
+		workerErrorCh:         make(chan *worker.Error, concurrency),
 		workerWg:              new(sync.WaitGroup),
 		logger:                logger,
 	}
@@ -132,9 +132,6 @@ func (p *Pool) loop() {
 
 		// Cancel the context associated with the worker pool to terminate any context-dependent operations.
 		p.contextCancelFunc()
-		// Stop the worker pool by invoking the Stop method.
-		// This ensures the pool is cleanly shut down once the current worker completes.
-		p.Stop()
 		// Signal that the worker has finished its job by decrementing the WaitGroup counter.
 		// This is important for synchronizing worker completion with the rest of the system.
 		p.workerWg.Done()
@@ -147,6 +144,7 @@ func (p *Pool) loop() {
 		// When this case is triggered, it indicates that the pool should be stopped.
 		case <-p.stopCh:
 			p.logger.Println("Stopping the worker pool...")
+			return
 		// Listen for the context's cancellation or timeout.
 		// When this case is triggered, it indicates that the context is done (canceled or timed out).
 		case <-p.ctx.Done():
@@ -157,6 +155,7 @@ func (p *Pool) loop() {
 				// Call the Stop method to stop the pool gracefully.
 				p.Stop()
 			}
+			return
 
 		// Why we need this case: at some point the worker stopCh closed, a negative waitGroup was triggered,
 		// and there was a leak. It could happen that all the workers go down, and then the task or tasks,
@@ -225,7 +224,11 @@ func (p *Pool) AddTaskInQueue(task worker.Task) (err error) {
 		// The default case allows the program to move on to adding the task to the queue.
 	}
 
-	if err = task.SetContext(p.ctx); err != nil {
+	// Attempt to assign the context to the task.
+	// The context is used to control the execution of the task, allowing for cancellation
+	// or timeout handling. This is important for ensuring tasks respect the lifecycle
+	// management provided by the worker pool.
+	if err := task.SetContext(p.ctx); err != nil {
 		// TODO: add logger
 		return err
 	}
@@ -286,13 +289,20 @@ func (p *Pool) AddWorker(wr worker.Worker) (err error) {
 	// Set the context for the worker. This context is used to control the worker's
 	// execution, including cancellation and timeouts. If setting the context fails,
 	// return the encountered error.
-	if err = wr.SetContext(p.ctx); err != nil {
+	if err := wr.SetContext(p.ctx); err != nil {
 		return err
 	}
 
 	// Assign the task queue to the worker. The worker will pull tasks from this queue
 	// for processing. If setting the queue fails, return the encountered error.
-	if err = wr.SetQueue(p.taskQueue); err != nil {
+	if err := wr.SetQueue(p.taskQueue); err != nil {
+		return err
+	}
+
+	// Attempt to assign the error channel to the worker.
+	// The error channel is used to report serious errors or panics that occur during
+	// the worker's operation, allowing the pool to detect and handle such issues.
+	if err := wr.SetWorkerErrChannel(p.workerErrorCh); err != nil {
 		return err
 	}
 
@@ -406,17 +416,11 @@ func (p *Pool) Stop() {
 		// Close the stopCh channel to prevent any further sends on this channel.
 		// This also signals to any listeners that the stop process is complete.
 		close(p.stopCh)
-
-		// Return from the Do function. Since this is inside sync.Once, this code block will not be executed again.
-		return
 	})
 
 	// Wait for all workers to finish processing their current tasks before returning from the Stop method.
 	// This ensures that all tasks are completed before the pool is fully shut down.
 	p.workerWg.Wait()
-
-	// Return from the Stop method, indicating that the pool has been successfully stopped.
-	return
 }
 
 // workerShutdown is responsible for shutting down a worker and removing it from the pool.
