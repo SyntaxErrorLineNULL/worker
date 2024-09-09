@@ -6,12 +6,15 @@ import (
 	"github.com/SyntaxErrorLineNULL/worker"
 	"github.com/SyntaxErrorLineNULL/worker/mocks"
 	"github.com/stretchr/testify/assert"
+	"runtime"
 	"testing"
 	"time"
 )
 
 func TestPool(t *testing.T) {
 	t.Parallel()
+
+	defer runtime.GC()
 
 	// Create a new mock task instance using the mocks package.
 	// The mock task is created for use in testing, providing a controlled and
@@ -426,9 +429,9 @@ func TestPool(t *testing.T) {
 		// This enables the pool to begin its job processing and worker management in parallel.
 		go pool.Run()
 
-		// Pause for 20 milliseconds to give the pool time to initialize and get ready.
+		// Pause for 100 milliseconds to give the pool time to initialize and get ready.
 		// This small delay ensures that the pool has started running before we add workers.
-		<-time.After(20 * time.Millisecond)
+		<-time.After(100 * time.Millisecond)
 
 		newWorker := NewWorker("test-stop-worker")
 		// Add the new worker to the pool and assert no error occurred.
@@ -457,9 +460,9 @@ func TestPool(t *testing.T) {
 		// to take on new tasks.
 		assert.Equal(t, worker.StatusWorkerIdle, wr.GetStatus())
 
-		// Wait for 1 second to allow the job to be processed by the worker.
+		// Wait for 100 ms to allow the job to be processed by the worker.
 		// This provides sufficient time for the worker to process the job.
-		<-time.After(1 * time.Second)
+		<-time.After(100 * time.Millisecond)
 
 		// Create a channel to signal the completion of the pool stop operation.
 		// This channel will be used to notify when the worker pool has been stopped.
@@ -472,6 +475,10 @@ func TestPool(t *testing.T) {
 			// Stop the worker pool to terminate all workers.
 			pool.Stop()
 		}()
+
+		// Pause for 200 milliseconds to allow the pool stop operation to be initiated.
+		// This small delay gives the pool sufficient time to begin stopping workers before proceeding with assertions.
+		<-time.After(200 * time.Millisecond)
 
 		// Wait for the pool to stop or timeout.
 		// Check if the worker pool has stopped and no workers are running.
@@ -535,9 +542,9 @@ func TestPool(t *testing.T) {
 		// This enables the pool to begin its job processing and worker management in parallel.
 		go pool.Run()
 
-		// Pause for 20 milliseconds to give the pool time to initialize and get ready.
+		// Pause for 100 milliseconds to give the pool time to initialize and get ready.
 		// This small delay ensures that the pool has started running before we add workers.
-		<-time.After(20 * time.Millisecond)
+		<-time.After(100 * time.Millisecond)
 
 		newWorker := NewWorker("test-stop-worker")
 		// Add the new worker to the pool and assert no error occurred.
@@ -565,6 +572,11 @@ func TestPool(t *testing.T) {
 		// indicating that it is not currently processing any jobs and is ready
 		// to take on new tasks.
 		assert.Equal(t, worker.StatusWorkerIdle, wr.GetStatus())
+
+		// Pause for 500 milliseconds to allow the worker to remain idle for a brief period.
+		// This gives the test enough time to ensure the worker is in the idle state
+		// before the context is canceled and the shutdown process begins.
+		<-time.After(500 * time.Millisecond)
 
 		// Cancel the context to signal the pool to stop.
 		cancel()

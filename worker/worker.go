@@ -62,6 +62,7 @@ func (w *Worker) SetContext(ctx context.Context) error {
 		return worker.ContextIsNilError
 	}
 
+	w.logger.Printf("SetContext")
 	// Assign the provided context to the worker's context field.
 	// This allows the worker to use this context for its operations.
 	w.workerContext = ctx
@@ -138,6 +139,7 @@ func (w *Worker) Restart(wg *sync.WaitGroup) {
 // mechanisms for recovery from panics to ensure that the worker continues operating smoothly
 // even if unexpected errors occur.
 func (w *Worker) Start(wg *sync.WaitGroup) {
+	w.logger.Printf("worker start: %s\n", w.workerName)
 	// As soon as a worker is created, it is necessarily in the status of StatusWorkerIdle.
 	// This indicates that the worker is ready but currently not processing any jobs.
 	w.setStatus(worker.StatusWorkerIdle)

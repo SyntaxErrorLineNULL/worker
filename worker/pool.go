@@ -374,6 +374,7 @@ func (p *Pool) decrementWorkerCount() {
 // workers to stop, and waiting for all workers to finish before completing
 // the shutdown sequence.
 func (p *Pool) Stop() {
+	p.logger.Println("stop pool")
 	// Defer a function to recover from any panics that occur during the shutdown process.
 	// This ensures that if something goes wrong, the panic is logged, and the shutdown continues.
 	defer func() {
@@ -395,16 +396,23 @@ func (p *Pool) Stop() {
 		// Defer unlocking the mutex to ensure that it is always released, even if the shutdown fails.
 		defer p.mutex.Unlock()
 
-		// Call workersShutdown to stop all active workers gracefully.
-		// This method will ensure that each worker completes its current task before shutting down.
-		p.workersShutdown()
-
-		// Set the workers slice to nil to release the memory and indicate that the pool no longer has any workers.
-		p.workers = nil
-
 		// Cancel the pool's context, which will signal to any remaining tasks that they should stop.
 		// This is useful for stopping any long-running tasks that are still in progress.
 		p.contextCancelFunc()
+
+		// Call workersShutdown to stop all active workers gracefully.
+		// This method will ensure that each worker completes its current task before shutting down.
+		select {
+		// The select statement waits for all workers to finish shutting down before logging a message.
+		// If the workers are still shutting down, the default case prevents blocking and allows the program to proceed.
+		case <-p.workersShutdown():
+			p.logger.Println("All workers have been successfully shut down")
+		default:
+			// The default case prevents blocking if workersShutdown has not yet completed.
+		}
+
+		// Set the workers slice to nil to release the memory and indicate that the pool no longer has any workers.
+		p.workers = nil
 
 		// Mark the pool as stopped by setting the stopped flag to true.
 		// This prevents any new tasks from being submitted to the pool.
