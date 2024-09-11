@@ -61,6 +61,11 @@ func TestPool(t *testing.T) {
 		// Assert that the pool is not in a stopped state initially.
 		// This ensures that the pool is active and ready to process jobs.
 		assert.False(t, pool.stopped, "Pool should not be marked as stopped initially")
+
+		// Assert that the pool's maximum worker restart limit is set to DefaultMaxRetry.
+		// This confirms that if no custom retry value was provided, the pool defaults to the correct predefined constant.
+		// Ensures that the retry behavior aligns with expected default behavior in the worker pool.
+		assert.Equal(t, int32(worker.DefaultMaxRetry), pool.maxRetryWorkerRestart, "Expected default max retry value to be set")
 	})
 
 	// WorkerShutdown tests the behavior of the worker pool's workerShutdown method.
