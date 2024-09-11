@@ -69,14 +69,19 @@ func NewWorkerPool(options *worker.Options) *Pool {
 	// The logger writes to standard output with a prefix "pool:" and includes standard log flags.
 	logger := log.New(os.Stdout, "pool:", log.LstdFlags)
 
-	// Log the creation of a new worker pool.
-	// logger.Print("new worker pool")
-
 	// Determine the concurrency level for the pool based on the provided options.
 	// If the WorkerCount is zero, default to twice the number of available CPU cores.
 	concurrency := options.WorkerCount
 	if concurrency == 0 {
 		concurrency = int32(runtime.NumCPU() * 2)
+	}
+
+	// Set the retry value for the maximum number of worker restarts.
+	// If MaxRetryWorkerRestart is not provided (i.e., set to 0), the pool will default to DefaultMaxRetry.
+	// This ensures that workers are restarted a reasonable number of times before giving up on recovery.
+	retry := options.MaxRetryWorkerRestart
+	if retry == 0 {
+		retry = worker.DefaultMaxRetry
 	}
 
 	// Create a new context with cancel functionality for the pool.
