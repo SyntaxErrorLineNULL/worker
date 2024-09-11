@@ -1,6 +1,13 @@
 package worker
 
-import "context"
+import (
+	"context"
+)
+
+// DefaultMaxRetry is the default number of times a worker is allowed to restart
+// after encountering a failure. If not explicitly set in the worker pool options,
+// this value is used to control the maximum retry attempts for restarting workers.
+const DefaultMaxRetry = 3
 
 // Options defines the configuration settings for a worker pool. It contains
 // the context for task processing, the task queue, and settings related to
