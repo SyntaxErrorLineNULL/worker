@@ -70,7 +70,7 @@ func NewWorkerPool(options *worker.Options) *Pool {
 	logger := log.New(os.Stdout, "pool:", log.LstdFlags)
 
 	// Log the creation of a new worker pool.
-	logger.Print("new worker pool")
+	// logger.Print("new worker pool")
 
 	// Determine the concurrency level for the pool based on the provided options.
 	// If the WorkerCount is zero, default to twice the number of available CPU cores.

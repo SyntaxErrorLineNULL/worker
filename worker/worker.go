@@ -30,9 +30,6 @@ type Worker struct {
 // It sets up necessary channels and a logger for the worker, and returns a pointer to the Worker.
 func NewWorker(workerName string) *Worker {
 	logger := log.New(os.Stdout, "pool:", log.LstdFlags)
-
-	logger.Print("new worker pool")
-
 	return &Worker{
 		workerName: workerName,
 		stopCh:     make(chan struct{}, 1),
@@ -62,7 +59,6 @@ func (w *Worker) SetContext(ctx context.Context) error {
 		return worker.ContextIsNilError
 	}
 
-	w.logger.Printf("SetContext")
 	// Assign the provided context to the worker's context field.
 	// This allows the worker to use this context for its operations.
 	w.workerContext = ctx
@@ -139,7 +135,7 @@ func (w *Worker) Restart(wg *sync.WaitGroup) {
 // mechanisms for recovery from panics to ensure that the worker continues operating smoothly
 // even if unexpected errors occur.
 func (w *Worker) Start(wg *sync.WaitGroup) {
-	w.logger.Printf("worker start: %s\n", w.workerName)
+	// w.logger.Printf("worker start: %s\n", w.workerName)
 	// As soon as a worker is created, it is necessarily in the status of StatusWorkerIdle.
 	// This indicates that the worker is ready but currently not processing any jobs.
 	w.setStatus(worker.StatusWorkerIdle)
@@ -217,7 +213,7 @@ func (w *Worker) Start(wg *sync.WaitGroup) {
 
 				// Execute the task's `Run` method.
 				// This method contains the logic to process the task.
-				task.Run()
+				go task.Run()
 
 				// After the task completes, reset the worker's `currentProcess` to `nil`.
 				// This clears the reference to the completed task.
