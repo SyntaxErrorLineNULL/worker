@@ -96,7 +96,7 @@ func NewWorkerPool(options *worker.Options) *Pool {
 		taskQueue:             options.Queue,
 		workers:               make([]worker.Worker, 0, concurrency),
 		maxWorkersCount:       concurrency,
-		maxRetryWorkerRestart: options.MaxRetryWorkerRestart,
+		maxRetryWorkerRestart: retry,
 		stopCh:                make(chan struct{}, 1),
 		stopped:               false,
 		workerErrorCh:         make(chan *worker.Error, concurrency),
