@@ -213,7 +213,7 @@ func (w *Worker) Start(wg *sync.WaitGroup) {
 
 				// Execute the task's `Run` method.
 				// This method contains the logic to process the task.
-				go task.Run()
+				task.Run()
 
 				// After the task completes, reset the worker's `currentProcess` to `nil`.
 				// This clears the reference to the completed task.
