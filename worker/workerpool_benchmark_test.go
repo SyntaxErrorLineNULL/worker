@@ -64,7 +64,7 @@ func BenchmarkWorkerPool(b *testing.B) {
 	}
 
 	if workerCount != pool.RunningWorkers() {
-		b.Fatal("wtf?!")
+		b.Fatal("failed running workers")
 	}
 
 	// Reset the benchmark timer to exclude setup time from the performance measurement.
