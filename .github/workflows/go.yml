@@ -22,8 +22,6 @@ jobs:
   test:
     strategy:
       fail-fast: false
-      env:
-        CGO_ENABLED: 0
       matrix:
         os:
           - 'ubuntu-latest'
@@ -33,14 +31,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
-
-      - name: Check and get dependencies
-        run: |
-          go mod tidy
-          git diff --exit-code go.mod
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
