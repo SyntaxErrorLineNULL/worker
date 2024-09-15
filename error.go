@@ -3,35 +3,35 @@ package worker
 import "errors"
 
 var (
-	// ContextIsNilError is an error indicating that a nil context was provided.
+	// ErrContextIsNil is an error indicating that a nil context was provided.
 	// This error is used to signal that an operation requiring a non-nil context
 	// encountered an invalid input, which could disrupt the operation's control flow.
-	ContextIsNilError = errors.New("context is nil")
+	ErrContextIsNil = errors.New("context is nil")
 
-	// ChanIsCloseError is an error indicating that a channel has been closed.
+	// ErrChanIsClose is an error indicating that a channel has been closed.
 	// This error is typically used when an operation attempts to send or receive
 	// on a closed channel, which is an illegal operation in Go.
-	ChanIsCloseError = errors.New("chan is close")
+	ErrChanIsClose = errors.New("chan is close")
 
-	// ChanIsEmptyError is an error indicating that a channel is empty.
+	// ErrChanIsEmpty is an error indicating that a channel is empty.
 	// This error might be used when an operation expected a channel to have available data,
 	// but found it empty, preventing the operation from proceeding as intended.
-	ChanIsEmptyError = errors.New("chan is empty")
+	ErrChanIsEmpty = errors.New("chan is empty")
 
-	// MaxWorkersReachedError is an error indicating that the maximum number of workers has been reached.
+	// ErrMaxWorkersReached is an error indicating that the maximum number of workers has been reached.
 	// This error is used to prevent the creation of additional workers beyond the allowed limit,
 	// ensuring that the system's resources are managed efficiently and within expected constraints.
-	MaxWorkersReachedError = errors.New("maximum number of workers reached")
+	ErrMaxWorkersReached = errors.New("maximum number of workers reached")
 
-	// WorkerIsNilError is an error that indicates an operation was attempted with a nil worker.
+	// ErrWorkerIsNil is an error that indicates an operation was attempted with a nil worker.
 	// This error is used to signal that a worker instance expected to be valid was found to be nil,
 	// and therefore the operation cannot proceed.
-	WorkerIsNilError = errors.New("worker is nil")
+	ErrWorkerIsNil = errors.New("worker is nil")
 
-	// WorkerPoolStopError is an error that indicates an operation was attempted on a stopped worker pool.
+	// ErrWorkerPoolStop is an error that indicates an operation was attempted on a stopped worker pool.
 	// This error is used to signal that the worker pool has been stopped, meaning no further work can be assigned
 	// or processed, and the operation should be terminated.
-	WorkerPoolStopError = errors.New("worker pool is stopped")
+	ErrWorkerPoolStop = errors.New("worker pool is stopped")
 )
 
 // Error encapsulates an error along with the reference to the Worker instance
