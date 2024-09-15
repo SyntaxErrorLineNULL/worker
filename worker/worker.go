@@ -30,9 +30,6 @@ type Worker struct {
 // It sets up necessary channels and a logger for the worker, and returns a pointer to the Worker.
 func NewWorker(workerName string) *Worker {
 	logger := log.New(os.Stdout, "pool:", log.LstdFlags)
-
-	logger.Print("new worker pool")
-
 	return &Worker{
 		workerName: workerName,
 		stopCh:     make(chan struct{}, 1),
@@ -59,10 +56,9 @@ func (w *Worker) SetContext(ctx context.Context) error {
 	// should not be used. Return an error in this case to prevent setting
 	// an invalid context for the worker.
 	if ctx == nil {
-		return worker.ContextIsNilError
+		return worker.ErrContextIsNil
 	}
 
-	w.logger.Printf("SetContext")
 	// Assign the provided context to the worker's context field.
 	// This allows the worker to use this context for its operations.
 	w.workerContext = ctx
@@ -83,7 +79,7 @@ func (w *Worker) SetQueue(queue chan worker.Task) error {
 		// If the receive operation fails, the channel is closed.
 		// Return an error indicating that the channel is closed.
 		if !ok {
-			return worker.ChanIsCloseError
+			return worker.ErrChanIsClose
 		}
 	// If the receive operation would block, continue without doing anything.
 	default:
@@ -109,7 +105,7 @@ func (w *Worker) SetWorkerErrChannel(errCh chan *worker.Error) error {
 		// If the receive operation fails, the channel is closed.
 		// Return an error indicating that the channel is closed.
 		if !ok {
-			return worker.ChanIsCloseError
+			return worker.ErrChanIsClose
 		}
 	// If the receive operation would block, continue without doing anything.
 	default:
@@ -139,7 +135,7 @@ func (w *Worker) Restart(wg *sync.WaitGroup) {
 // mechanisms for recovery from panics to ensure that the worker continues operating smoothly
 // even if unexpected errors occur.
 func (w *Worker) Start(wg *sync.WaitGroup) {
-	w.logger.Printf("worker start: %s\n", w.workerName)
+	// w.logger.Printf("worker start: %s\n", w.workerName)
 	// As soon as a worker is created, it is necessarily in the status of StatusWorkerIdle.
 	// This indicates that the worker is ready but currently not processing any jobs.
 	w.setStatus(worker.StatusWorkerIdle)

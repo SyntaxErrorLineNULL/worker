@@ -61,6 +61,11 @@ func TestPool(t *testing.T) {
 		// Assert that the pool is not in a stopped state initially.
 		// This ensures that the pool is active and ready to process jobs.
 		assert.False(t, pool.stopped, "Pool should not be marked as stopped initially")
+
+		// Assert that the pool's maximum worker restart limit is set to DefaultMaxRetry.
+		// This confirms that if no custom retry value was provided, the pool defaults to the correct predefined constant.
+		// Ensures that the retry behavior aligns with expected default behavior in the worker pool.
+		assert.Equal(t, int32(worker.DefaultMaxRetry), pool.maxRetryWorkerRestart, "Expected default max retry value to be set")
 	})
 
 	// WorkerShutdown tests the behavior of the worker pool's workerShutdown method.
@@ -179,9 +184,9 @@ func TestPool(t *testing.T) {
 		// This ensures that the pool correctly handles invalid input by returning an appropriate error.
 		assert.Error(t, err, "Expected error when adding a nil worker, but no error was returned")
 
-		// Assert that the error returned is specifically of type WorkerIsNilError.
+		// Assert that the error returned is specifically of type ErrWorkerIsNil.
 		// This checks that the error type matches the expected error for adding a nil worker.
-		assert.ErrorIs(t, err, worker.WorkerIsNilError, "The error returned when adding a nil worker was not of type WorkerIsNilError")
+		assert.ErrorIs(t, err, worker.ErrWorkerIsNil, "The error returned when adding a nil worker was not of type ErrWorkerIsNil")
 	})
 
 	// AddWorkerWithStoppedPool tests the behavior of the AddWorker method when
@@ -221,10 +226,10 @@ func TestPool(t *testing.T) {
 		// This confirms that the pool correctly identifies its stopped state and prevents
 		// further modifications to its worker list.
 		assert.Error(t, err, "Expected error when adding a worker to a stopped pool, but no error was returned")
-		// Assert that the error returned is specifically of type WorkerPoolStopError.
+		// Assert that the error returned is specifically of type ErrWorkerPoolStop.
 		// This verifies that the pool returns the correct error type, indicating that
 		// the pool is stopped and cannot accept new workers.
-		assert.ErrorIs(t, err, worker.WorkerPoolStopError, "The error returned when adding a worker to a stopped pool was not of type WorkerPoolStopError")
+		assert.ErrorIs(t, err, worker.ErrWorkerPoolStop, "The error returned when adding a worker to a stopped pool was not of type ErrWorkerPoolStop")
 	})
 
 	// SuccessfullyAddsTask tests the behavior of the `AddTaskInQueue` method
