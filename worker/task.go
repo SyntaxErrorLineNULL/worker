@@ -85,7 +85,7 @@ func (t *Task) SetDoneChannel(done chan struct{}) error {
 	// Check if the provided channel is nil. A nil channel is invalid and
 	// cannot be used, so return an error in this case.
 	if done == nil {
-		return worker.ChanIsEmptyError
+		return worker.ErrChanIsEmpty
 	}
 
 	// Use a non-blocking select statement to check if the channel is closed.
@@ -95,7 +95,7 @@ func (t *Task) SetDoneChannel(done chan struct{}) error {
 	case <-done:
 		// If this case is executed, it means the channel has already been closed.
 		// Return an error indicating that a closed channel cannot be set.
-		return worker.ChanIsCloseError
+		return worker.ErrChanIsClose
 	default:
 		// If the channel is not closed (i.e., it's still open), proceed to set it.
 		// This case will execute immediately if the channel is open.

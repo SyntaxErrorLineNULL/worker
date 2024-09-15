@@ -214,7 +214,7 @@ func (p *Pool) AddTaskInQueue(task worker.Task) (err error) {
 	// Check if the taskQueue is nil, indicating that the queue has not been initialized.
 	// If the taskQueue is nil, return an error indicating that the channel is empty.
 	if p.taskQueue == nil {
-		return worker.ChanIsEmptyError
+		return worker.ErrChanIsEmpty
 	}
 
 	// Use a select statement to check the state of the taskQueue channel.
@@ -223,7 +223,7 @@ func (p *Pool) AddTaskInQueue(task worker.Task) (err error) {
 	case <-p.taskQueue:
 		// If the channel is closed, return an error indicating that the channel is closed.
 		// This prevents adding tasks to a closed channel, which would cause a panic.
-		return worker.ChanIsCloseError
+		return worker.ErrChanIsClose
 	default:
 		// If the channel is not closed, continue execution without blocking.
 		// The default case allows the program to move on to adding the task to the queue.
@@ -253,13 +253,13 @@ func (p *Pool) AddWorker(wr worker.Worker) (err error) {
 	// Check if the pool has been stopped. If it has, return an error indicating
 	// that no more workers can be added.
 	if p.stopped {
-		return worker.WorkerPoolStopError
+		return worker.ErrWorkerPoolStop
 	}
 
 	// Check if the provided worker is nil. If it is, return an error indicating
 	// that a nil worker cannot be added.
 	if wr == nil {
-		return worker.WorkerIsNilError
+		return worker.ErrWorkerIsNil
 	}
 
 	// Use a defer statement to recover from any panic that occurs during the
@@ -282,7 +282,7 @@ func (p *Pool) AddWorker(wr worker.Worker) (err error) {
 	// If the worker count cannot be incremented (e.g., because the limit has been reached),
 	// return an error indicating that the maximum number of workers has been reached.
 	if !p.incrementWorkerCount() {
-		return worker.MaxWorkersReachedError
+		return worker.ErrMaxWorkersReached
 	}
 
 	// Lock the pool's mutex to ensure thread safety when modifying the pool's state.

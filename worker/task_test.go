@@ -94,7 +94,7 @@ func TestTask(t *testing.T) {
 	// SetCloseChannel tests the behavior of the `SetDoneChannel` method when a closed channel is provided.
 	// It ensures that the method correctly handles the scenario where an attempt is made to set a channel
 	// that is already closed. The test verifies that an appropriate error is returned, specifically
-	// checking for the `wr.ChanIsCloseError` type, which indicates that the channel is no longer usable.
+	// checking for the `wr.ErrChanIsClose` type, which indicates that the channel is no longer usable.
 	t.Run("SetCloseChannel", func(t *testing.T) {
 		// Create a channel of type struct{} to be used as the "done" channel.
 		// This channel will be used to signal completion or termination.
@@ -116,9 +116,9 @@ func TestTask(t *testing.T) {
 		// This confirms that the method behaves as expected and handles the error condition properly.
 		assert.Error(t, err, "Expected an error when setting a closed channel")
 
-		// Assert that the returned error is of the specific type wr.ChanIsCloseError.
+		// Assert that the returned error is of the specific type wr.ErrChanIsClose.
 		// This ensures that the error returned matches the expected error type for a closed channel.
-		assert.ErrorIs(t, err, wr.ChanIsCloseError, "Expected error to be wr.ChanIsCloseError")
+		assert.ErrorIs(t, err, wr.ErrChanIsClose, "Expected error to be wr.ErrChanIsClose")
 	})
 
 	// SetEmptyChannel tests the SetDoneChannel method of the Task struct

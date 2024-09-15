@@ -56,7 +56,7 @@ func (w *Worker) SetContext(ctx context.Context) error {
 	// should not be used. Return an error in this case to prevent setting
 	// an invalid context for the worker.
 	if ctx == nil {
-		return worker.ContextIsNilError
+		return worker.ErrContextIsNil
 	}
 
 	// Assign the provided context to the worker's context field.
@@ -79,7 +79,7 @@ func (w *Worker) SetQueue(queue chan worker.Task) error {
 		// If the receive operation fails, the channel is closed.
 		// Return an error indicating that the channel is closed.
 		if !ok {
-			return worker.ChanIsCloseError
+			return worker.ErrChanIsClose
 		}
 	// If the receive operation would block, continue without doing anything.
 	default:
@@ -105,7 +105,7 @@ func (w *Worker) SetWorkerErrChannel(errCh chan *worker.Error) error {
 		// If the receive operation fails, the channel is closed.
 		// Return an error indicating that the channel is closed.
 		if !ok {
-			return worker.ChanIsCloseError
+			return worker.ErrChanIsClose
 		}
 	// If the receive operation would block, continue without doing anything.
 	default:
