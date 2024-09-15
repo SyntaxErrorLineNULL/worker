@@ -43,7 +43,7 @@ jobs:
           version: v1.59.1
           # The installation mode `goinstall` always uses `CGO_ENABLED=1`.
           install-mode: goinstall
-          args: --timeout=10m
+          args: --timeout=3m --config .golangci.yaml
 
       - name: Test
         run: 'make test'
