@@ -3,7 +3,6 @@ package worker
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
@@ -215,7 +214,6 @@ func (t *Task) Run() {
 	// A signal was received from the stop channel stopCh, indicating that the task should stop its execution.
 	// This signal is typically sent when the Stop method is called, which means the task is being explicitly requested to terminate.
 	case <-t.stopCh:
-		fmt.Println("\nStop ch")
 		// Cancel the context to immediately stop any ongoing or pending operations associated with this task.
 		// This ensures that the task's processing halts as soon as possible.
 		cancel()
