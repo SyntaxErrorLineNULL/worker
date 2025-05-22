@@ -11,8 +11,6 @@ import (
 // methods for handling errors and stopping execution. Implementations of this interface are
 // expected to provide specific behavior for processing job, handling interruptions, and
 // managing execution state.
-//
-//go:generate mockery --name=Task
 type Task interface {
 	// SetWaitGroup assigns a sync.WaitGroup to the task.
 	// This allows the task to signal completion when it has finished its execution.
@@ -57,8 +55,6 @@ type Task interface {
 // A Pool is responsible for initializing and managing a set of worker goroutines that process jobs concurrently.
 // It includes methods for adding task and workers, retrieving the count of running workers, and stopping the entire pool.
 // This interface facilitates efficient task processing and dynamic scaling of worker resources.
-//
-//go:generate mockery --name=Pool
 type Pool interface {
 	// Run starts the worker pool and initializes worker goroutines to process jobs.
 	// This method sets up the worker pool, starts all the worker goroutines, and prepares them to begin processing jobs.
@@ -94,8 +90,6 @@ type Pool interface {
 // Worker represents an interface for a worker in a worker pool system.
 // A worker is responsible for processing jobs assigned to it and managing its own lifecycle.
 // It allows external components to start, stop, and monitor the worker's status and errors.
-//
-//go:generate mockery --name=Worker
 type Worker interface {
 	// SetContext assigns a context to the worker.
 	// The context is used to control the worker's execution and can be used to
