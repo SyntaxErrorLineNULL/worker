@@ -22,7 +22,7 @@ jobs:
         uses: golangci/golangci-lint-action@v8
         with:
           version: v2.1.0 # Latest stable v2 release as of May 2025
-          args: --timeout 3m --config .golangci.yaml
+          args: --timeout 3m --config .golangci.bck.yaml
           only-new-issues: true # Show only new issues on PRs
 
   test-nocache:
