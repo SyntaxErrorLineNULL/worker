@@ -1,0 +1,23 @@
+# IDEA in VCS https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
+# If some of these files are tracking then you nedd remove tracking from files:
+#> git rm --cache .idea/workspace.xml
+#> git rm --cache .idea/usage.statistics.xml
+#> git rm --cache -r .idea/shelf/
+.idea
+.vscode
+
+build/
+data/
+_data/
+tmp/
+
+.envrc
+*.pem
+*.json
+
+docker.dev.env
+
+.gitlab-ci-lo*
+/logs
+
+/test/testdata
