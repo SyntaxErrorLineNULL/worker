@@ -177,7 +177,7 @@ func (w *Worker) Start(wg *sync.WaitGroup) {
 
 		// This case handles the situation where the worker's parent context is done.
 		// The worker listens to the `workerContext` channel for a done signal,
-		// which indicates that the context in which the worker operates has been cancelled or expired.
+		// which indicates that the context in which the worker operates has been canceled or expired.
 		case <-w.workerContext.Done():
 			w.logger.Print("parent context is close")
 			// Set the worker status to stopped.
@@ -188,7 +188,7 @@ func (w *Worker) Start(wg *sync.WaitGroup) {
 
 			// Exit the loop, effectively stopping the worker's execution.
 			// The `return` statement breaks out of the infinite loop and stops further processing.
-			// This ensures that the worker ceases its operations when the parent context is cancelled,
+			// This ensures that the worker ceases its operations when the parent context is canceled,
 			// allowing it to exit gracefully and freeing up resources.
 			return
 
