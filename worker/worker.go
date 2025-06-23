@@ -196,30 +196,27 @@ func (w *Worker) Start(wg *sync.WaitGroup) {
 		// The <-w.queue operation attempts to receive a task from the channel.
 		// The ok variable indicates whether the channel is still open true or has been closed false.
 		case task, ok := <-w.queue:
-			// Check if the job channel is closed.
-			if ok {
-				// Check if the received task is not nil.
-				if task != nil {
-					// Assign the received task to the worker's `currentProcess` field.
-					// This keeps track of the task currently being executed by the worker.
-					w.currentProcess = task
+			// Check if the job channel is closed and task is nil.
+			if ok && task != nil {
+				// Assign the received task to the worker's `currentProcess` field.
+				// This keeps track of the task currently being executed by the worker.
+				w.currentProcess = task
 
-					// Increment the WaitGroup counter to account for the new task being processed.
-					// This helps synchronize the completion of the task with other concurrent operations.
-					wg.Add(1)
+				// Increment the WaitGroup counter to account for the new task being processed.
+				// This helps synchronize the completion of the task with other concurrent operations.
+				wg.Add(1)
 
-					// Set the WaitGroup for the task. This allows the task to signal when it has completed.
-					// The `task.SetWaitGroup(workerWg)` call ensures that the task can signal its completion.
-					_ = task.SetWaitGroup(wg)
+				// Set the WaitGroup for the task. This allows the task to signal when it has completed.
+				// The `task.SetWaitGroup(workerWg)` call ensures that the task can signal its completion.
+				_ = task.SetWaitGroup(wg)
 
-					// Execute the task's `Run` method.
-					// This method contains the logic to currentProcess the task.
-					task.Run(w.timeout)
+				// Execute the task's `Run` method.
+				// This method contains the logic to currentProcess the task.
+				task.Run(w.timeout)
 
-					// After the task completes, reset the worker's `currentProcess` to `nil`.
-					// This clears the reference to the completed task.
-					w.currentProcess = nil
-				}
+				// After the task completes, reset the worker's `currentProcess` to `nil`.
+				// This clears the reference to the completed task.
+				w.currentProcess = nil
 			} else {
 				// If the task queue channel is closed
 				w.logger.Printf("task queue is close: worker: %s", w.workerName)
