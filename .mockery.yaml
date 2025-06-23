@@ -1,0 +1,15 @@
+quiet: false
+disable-version-string: true
+mockname: "{{.InterfaceName}}"
+filename: "{{.MockName}}.go"
+outpkg: "{{.PackageName}}"
+with-expecter: true
+packages:
+  github.com/SyntaxErrorLineNULL/worker:
+    config:
+      dir: "mocks/"
+      outpkg: "mocks"
+    interfaces:
+      Task:
+      Pool:
+      Worker:
